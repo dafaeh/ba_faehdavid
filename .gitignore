@@ -47,3 +47,8 @@ po/*~
 
 # RStudio Connect folder
 rsconnect/
+# geodata
+*.tif
+*.tiff
+*.nc
+data/
