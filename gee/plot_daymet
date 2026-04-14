@@ -1,0 +1,23 @@
+// CONUS bounding box
+var aoi = ee.Geometry.Rectangle([-125.0, 24.5, -66.5, 49.5]);
+var year = 2020;
+var m = 7;
+
+// Load DAYMET July precipitation for CONUS
+// No reproject needed for visualization — GEE handles display resolution automatically.
+// DAYMET native resolution is ~1 km; forcing 30 m over CONUS would be intractable.
+var prcp = ee.ImageCollection('NASA/ORNL/DAYMET_V4')
+  .filter(ee.Filter.calendarRange(year, year, 'year'))
+  .filter(ee.Filter.calendarRange(m, m, 'month'))
+  .select('prcp')
+  .sum();
+
+Map.centerObject(aoi, 5);
+Map.addLayer(
+  prcp.clip(aoi),
+  {min: 0, max: 150, palette: ['white', 'lightblue', 'blue', 'darkblue']},
+  'DAYMET prcp July 2020'
+);
+
+// Print native resolution
+print('Native resolution (m):', prcp.projection().nominalScale());

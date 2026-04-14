@@ -1,0 +1,25 @@
+var aoi = ee.Geometry.Rectangle([-123.80, 39.65, -123.40, 39.90]);
+var year = 2020;
+var months = ee.List.sequence(1, 12);
+
+var et_monthly = ee.ImageCollection(months.map(function(m) {
+  m = ee.Number(m);
+  return ee.ImageCollection('projects/openet/assets/disalexi/conus/gridmet/monthly/v2_1')
+    .filterDate(ee.Date.fromYMD(year, m, 1),
+                ee.Date.fromYMD(year, m, 1).advance(1, 'month'))
+    .filterBounds(aoi)
+    .select('et')
+    .mean()
+    .set('system:time_start', ee.Date.fromYMD(year, m, 1).millis())
+    .rename('et');
+}));
+
+// plot each month as a separate layer
+months.evaluate(function(monthList) {
+  monthList.forEach(function(m) {
+    var img = ee.Image(et_monthly.toList(12).get(m - 1)).clip(aoi);
+    Map.addLayer(img, {min: 0, max: 100, palette: ['white', 'lightblue', 'blue']}, 'ET month ' + m);
+  });
+});
+
+Map.centerObject(aoi, 11);

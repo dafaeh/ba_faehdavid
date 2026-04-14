@@ -1,0 +1,64 @@
+var point = ee.Geometry.Point([-123.65, 39.73]);
+var start = '2016-01-01';
+var end   = '2021-12-31';
+
+var years  = ee.List.sequence(2016, 2021);
+var months = ee.List.sequence(1, 12);
+
+var prcp_monthly = ee.ImageCollection(ee.List(years.map(function(y) {
+  return ee.List(months.map(function(m) {
+    return ee.ImageCollection('NASA/ORNL/DAYMET_V4')
+      .filterDate(start, end)
+      .select('prcp')
+      .filter(ee.Filter.calendarRange(y, y, 'year'))
+      .filter(ee.Filter.calendarRange(m, m, 'month'))
+      .sum()
+      .set('system:time_start', ee.Date.fromYMD(y, m, 1).millis());
+  }));
+})).flatten());
+
+var prcp_ts = prcp_monthly.map(function(img) {
+  img = ee.Image(img);
+  var val = img.reduceRegion({
+    reducer: ee.Reducer.first(),
+    geometry: point,
+    scale: 1000
+  });
+  return ee.Feature(null, {
+    'date': ee.Date(img.get('system:time_start')).format('YYYY-MM-dd'),
+    'prcp': val.get('prcp')
+  });
+});
+
+print(ui.Chart.feature.byFeature(prcp_ts, 'date', 'prcp')
+  .setChartType('LineChart')
+  .setOptions({
+    title: 'Monthly precipitation at Elder Creek (mm/month)',
+    hAxis: {title: 'Date'},
+    vAxis: {title: 'P (mm/month)'}
+  }));
+  
+
+var et_ts = ee.ImageCollection('projects/openet/assets/disalexi/conus/gridmet/monthly/v2_1')
+    .filterDate(start, end)
+    .filterBounds(point)
+    .select('et')
+    .map(function(img) {
+      var val = img.reduceRegion({
+        reducer: ee.Reducer.first(),
+        geometry: point,
+        scale: 30
+      });
+      return ee.Feature(null, {
+        'date': img.date().format('YYYY-MM-dd'),
+        'et': val.get('et')
+      });
+    });
+
+print(ui.Chart.feature.byFeature(et_ts, 'date', 'et')
+  .setChartType('LineChart')
+  .setOptions({
+    title: 'Monthly ET at Elder Creek (mm/month)',
+    hAxis: {title: 'Date'},
+    vAxis: {title: 'ET (mm/month)'}
+  }));

@@ -1,0 +1,74 @@
+var aoi = ee.Geometry.Rectangle([-118.784, 36.074, -118.620, 36.180]);
+var year = 2020;
+var startDate = ee.Date.fromYMD(year, 1, 1);
+var endDate   = ee.Date.fromYMD(year + 1, 1, 1);
+
+// ── 1. Load and filter collections once for the full year ────────────────────
+// Spatial filter is applied first to reduce the number of images before
+// the (more expensive) date filter is evaluated.
+var etCol = ee.ImageCollection('projects/openet/assets/disalexi/conus/gridmet/monthly/v2_1')
+  .filterBounds(aoi)
+  .filterDate(startDate, endDate)
+  .select('et');
+
+var prcpCol = ee.ImageCollection('NASA/ORNL/DAYMET_V4')
+  .filterBounds(aoi)
+  .filterDate(startDate, endDate)
+  .select('prcp');
+
+// ── 2. Build a monthly collection with ET and PRCP as two bands ──────────────
+// Each image represents one month. ET is averaged across available scenes;
+// PRCP is summed to get the monthly total in mm.
+// Combining both variables into a single two-band image reduces overhead
+// compared to keeping them in separate collections.
+var months = ee.List.sequence(1, 12);
+
+var monthlyCol = ee.ImageCollection(months.map(function(m) {
+  m = ee.Number(m);
+  var t0 = ee.Date.fromYMD(year, m, 1);
+  var t1 = t0.advance(1, 'month');
+
+  var et   = etCol.filterDate(t0, t1).mean().unmask(0).rename('et');
+  var prcp = prcpCol.filterDate(t0, t1).sum().rename('prcp');
+
+  return et.addBands(prcp)
+    .set('system:time_start', t0.millis());
+}));
+
+// ── 3. Compute monthly water deficit (ET − precipitation) ────────────────────
+// A positive deficit means evapotranspiration exceeded precipitation,
+// indicating moisture stress. The result is converted to a list once here
+// so it can be accessed efficiently inside the accumulation loop below.
+var deficitList = monthlyCol.map(function(img) {
+  return img.select('et').subtract(img.select('prcp')).rename('deficit');
+}).toList(12);
+
+// ── 4. Accumulate climatic water deficit (CWD) over the year ─────────────────
+// CWD is a running sum of monthly deficits. It resets to zero whenever
+// precipitation exceeds ET (i.e. the deficit cannot go negative).
+// The iterate() starts with a zero image as the initial accumulator.
+var cwdList = ee.List.sequence(0, 11).iterate(function(i, acc) {
+  var prev    = ee.Image(ee.List(acc).get(-1));
+  var deficit = ee.Image(deficitList.get(i));
+  return ee.List(acc).add(
+    prev.add(deficit).max(ee.Image.constant(0)).rename('cwd')
+  );
+}, ee.List([ee.Image.constant(0).rename('cwd')]));
+
+// Take the maximum CWD reached across all months and clip to the AOI.
+// This represents the peak drought stress experienced during the year.
+var cwdMax = ee.ImageCollection(ee.List(cwdList).slice(1)).max().clip(aoi);
+
+// ── 5. Export result to Google Drive ─────────────────────────────────────────
+// Output is projected to EPSG:5070 (Conus Albers) at 30 m resolution,
+// matching the native resolution of the DisALEXI ET product.
+Export.image.toDrive({
+  image: cwdMax,
+  description: 'CWD_max_2020_TestSite_code_2',
+  folder: 'GEE_CWD_exports',
+  fileNamePrefix: 'CWD_max_2020_TestSite_code_2',
+  region: aoi,
+  scale: 30,
+  crs: 'EPSG:5070',
+  maxPixels: 1e9
+});

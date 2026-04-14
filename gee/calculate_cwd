@@ -1,0 +1,70 @@
+var aoi = ee.Geometry.Rectangle([-123.80, 39.65, -123.40, 39.90]);
+var year = 2020;
+var months = ee.List.sequence(1, 12);
+
+// load monthly ET (DisALEXI), merge overlapping tiles with .mean()
+var et_monthly = ee.ImageCollection(months.map(function(m) {
+  m = ee.Number(m);
+  var img = ee.ImageCollection('projects/openet/assets/disalexi/conus/gridmet/monthly/v2_1')
+    .filterDate(ee.Date.fromYMD(year, m, 1),
+                ee.Date.fromYMD(year, m, 1).advance(1, 'month'))
+    .filterBounds(aoi)
+    .select('et')
+    .mean()
+    .set('system:time_start', ee.Date.fromYMD(year, m, 1).millis())
+    .rename('et');
+  return img.unmask(0);  // fill missing pixels with 0
+}));
+
+// load monthly precipitation (sum daily DAYMET values)
+var prcp_monthly = ee.ImageCollection(months.map(function(m) {
+  return ee.ImageCollection('NASA/ORNL/DAYMET_V4')
+    .filter(ee.Filter.calendarRange(year, year, 'year'))
+    .filter(ee.Filter.calendarRange(m, m, 'month'))
+    .filterBounds(aoi)
+    .select('prcp')
+    .sum()
+    .resample('bilinear')
+    .reproject({crs: 'EPSG:32610', scale: 30})    
+    .set('system:time_start', ee.Date.fromYMD(year, m, 1).millis())
+    .rename('prcp');
+}));
+
+// compute monthly deficit (ET - P) and accumulate CWD
+var deficit_list = months.map(function(m) {
+  var et   = ee.Image(et_monthly.toList(12).get(ee.Number(m).subtract(1)));
+  var prcp = ee.Image(prcp_monthly.toList(12).get(ee.Number(m).subtract(1)));
+  return et.subtract(prcp).rename('deficit');
+});
+
+var cwd_list = ee.List.sequence(0, 11).iterate(function(i, acc) {
+  var prev    = ee.Image(ee.List(acc).get(-1));
+  var deficit = ee.Image(deficit_list.get(i));
+  return ee.List(acc).add(prev.add(deficit).max(0).rename('cwd'));
+}, ee.List([ee.Image(0).rename('cwd')]));
+
+// maximum CWD across all months
+var cwd_max = ee.ImageCollection(ee.List(cwd_list).slice(1)).max().clip(aoi);
+
+print('ET collection size:', et_monthly.size());
+print('PRCP collection size:', prcp_monthly.size());
+print('Deficit collection size:', 
+  ee.ImageCollection(deficit_list.map(function(img){
+    return ee.Image(img);
+  })).size()
+);
+
+// display
+Map.centerObject(aoi, 10);
+Map.addLayer(
+  cwd_max,
+  {min: 0, max: 800, palette: ['white', 'yellow', 'orange', 'red']},
+  'Max seasonal CWD 2020 (mm)'
+);
+
+print('CWD stats:', cwd_max.reduceRegion({
+  reducer: ee.Reducer.minMax(),
+  geometry: aoi,
+  scale: 500,
+  maxPixels: 1e9
+}));

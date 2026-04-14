@@ -1,0 +1,69 @@
+var point = ee.Geometry.Point([-123.65, 39.73]);
+var years = ee.List.sequence(2016, 2023);
+var months = ee.List.sequence(1, 12);
+
+// function to compute max CWD for one year
+var computeMaxCWD = function(year) {
+  year = ee.Number(year);
+
+  var et_monthly = ee.ImageCollection(months.map(function(m) {
+    m = ee.Number(m);
+    return ee.ImageCollection('projects/openet/assets/disalexi/conus/gridmet/monthly/v2_1')
+      .filterDate(ee.Date.fromYMD(year, m, 1),
+                  ee.Date.fromYMD(year, m, 1).advance(1, 'month'))
+      .filterBounds(point)
+      .select('et')
+      .mean()
+      .unmask(0)
+      .set('system:time_start', ee.Date.fromYMD(year, m, 1).millis())
+      .rename('et');
+  }));
+
+  var prcp_monthly = ee.ImageCollection(months.map(function(m) {
+    m = ee.Number(m);
+    return ee.ImageCollection('NASA/ORNL/DAYMET_V4')
+      .filterDate(ee.Date.fromYMD(year, m, 1),
+                  ee.Date.fromYMD(year, m, 1).advance(1, 'month'))
+      .filterBounds(point)
+      .select('prcp')
+      .sum()
+      .set('system:time_start', ee.Date.fromYMD(year, m, 1).millis())
+      .rename('prcp');
+  }));
+
+  var deficit_list = months.map(function(m) {
+    m = ee.Number(m).subtract(1);
+    var et   = ee.Image(et_monthly.toList(12).get(m));
+    var prcp = ee.Image(prcp_monthly.toList(12).get(m));
+    return et.subtract(prcp).rename('deficit');
+  });
+
+  var cwd_list = ee.List.sequence(0, 11).iterate(function(i, acc) {
+    var prev    = ee.Image(ee.List(acc).get(-1));
+    var deficit = ee.Image(deficit_list.get(i));
+    return ee.List(acc).add(prev.add(deficit).max(0).rename('cwd'));
+  }, ee.List([ee.Image(0).rename('cwd')]));
+
+  var cwd_max = ee.ImageCollection(ee.List(cwd_list).slice(1)).max();
+
+  var val = cwd_max.reduceRegion({
+    reducer: ee.Reducer.first(),
+    geometry: point,
+    scale: 30
+  });
+
+  return ee.Feature(null, {
+    'year': year,
+    'cwd_max': val.get('cwd')
+  });
+};
+
+var cwd_timeseries = ee.FeatureCollection(years.map(computeMaxCWD));
+
+print(ui.Chart.feature.byFeature(cwd_timeseries, 'year', 'cwd_max')
+  .setChartType('LineChart')
+  .setOptions({
+    title: 'Max seasonal CWD at Elder Creek',
+    hAxis: {title: 'Year'},
+    vAxis: {title: 'Max CWD (mm)'}
+  }));
