@@ -1,8 +1,8 @@
 // plot_geology_focus_region.js
-// Visualisation of surface lithology and elevation over two study regions.
+// Visualisation of surface lithology and elevation over two focus regions (Edwards Plateau and Northern California).
 // Data: CSP/ERGo/1_0/US/lithology, USGS/SRTMGL1_003
 
-// Study areas
+// Focus regions
 var geometry = ee.Geometry.Polygon(
     [[[-100.27776465680033, 32.660183285641914],
       [-100.27776465680033, 28.789320221427214],
@@ -33,6 +33,10 @@ Map.addLayer(lithology, lithologyVis, 'Lithology');
 // Elevation (SRTM)
 var dem = ee.Image('USGS/SRTMGL1_003');
 Map.addLayer(dem, { min: 0, max: 2000, palette: ['000000', 'ffffff'] }, 'Elevation');
+
+// Focus region outlines
+Map.addLayer(geometry,  { color: 'd63000' }, 'Edwards Plateau');
+Map.addLayer(geometry2, { color: '00ff00' }, 'N. California');
 
 // Areas
 print('Area geometry  (km2):', geometry.area(1).divide(1e6));

@@ -1,8 +1,8 @@
 // plot_land_use_focus_region.js
-// Visualisation of NLCD 2021 land cover over one study region (Great Plains).
+// Visualisation of NLCD 2021 land cover over one focus region (Great Plains).
 // Data: USGS/NLCD_RELEASES/2021_REL/NLCD
 
-// Study area
+// Focus region
 var geometry = ee.Geometry.Polygon(
     [[[-103.73661176242638, 40.588750552430916],
       [-103.73661176242638, 36.326001518952935],
@@ -21,6 +21,9 @@ var landcover = nlcd2021.select('landcover');
 // Display
 Map.setCenter(-95, 38, 5);
 Map.addLayer(landcover, null, 'Landcover');
+
+// Focus region outline
+Map.addLayer(geometry, { color: 'ffc82d' }, 'Great Plains');
 
 // Area
 print('Area (km2):', geometry.area(1).divide(1e6));

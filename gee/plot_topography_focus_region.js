@@ -1,8 +1,8 @@
 // plot_topography_focus_region.js
-// Visualisation of elevation over two study regions (Appalachians and Northern California).
+// Visualisation of elevation over two focus regions (Appalachians and Northern California).
 // Data: USGS/SRTMGL1_003
 
-// Study areas
+// Focus regions
 var geometry = ee.Geometry.Polygon(
     [[[-84.05115497183012, 40.97746916994725],
       [-84.05115497183012, 37.16650782156939],
@@ -18,6 +18,10 @@ var geometry2 = ee.Geometry.Polygon(
 // Elevation (SRTM)
 var dem = ee.Image('USGS/SRTMGL1_003');
 Map.addLayer(dem, { min: 0, max: 2000, palette: ['000000', 'ffffff'] }, 'Elevation');
+
+// Focus region outlines
+Map.addLayer(geometry,  { color: 'bf04c2' }, 'Appalachians');
+Map.addLayer(geometry2, { color: '00ff00' }, 'N. California');
 
 // Areas
 print('Area geometry  (km2):', geometry.area(1).divide(1e6));
