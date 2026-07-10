@@ -79,7 +79,7 @@ nlcd_class <- terra::classify(
 )
 names(nlcd_class) <- "class"
 
-# Nearest-neighbour resampling is mandatory for categorical data.
+# use method = near for categorial data
 nlcd_aligned <- terra::resample(nlcd_class, r_cwd, method = "near")
 
 
@@ -127,75 +127,42 @@ readr::write_csv(df_sample, here("data", "h4_test1_samples.csv"))
 
 # ---- Quality filter ---------------------------------------------------------
 
-# Drop pixels where more than 6 of the 36 analysis months were gap-filled;
-# these have a less reliable CWDmax.
-df_filtered <- df_sample |>
-  dplyr::filter(gap_filled_months <= 6)
+df_filtered <- df_sample
 
+# Eventually drop pixels with too many gap filled months, for example:
 
-# ---- Descriptive statistics -------------------------------------------------
-
-df_desc <- df_filtered |>
-  dplyr::group_by(class) |>
-  dplyr::summarise(
-    n          = dplyr::n(),
-    median_mm  = median(cwd_max),
-    mean_mm    = mean(cwd_max),
-    sd_mm      = sd(cwd_max),
-    q25_mm     = quantile(cwd_max, 0.25),
-    q75_mm     = quantile(cwd_max, 0.75),
-    gap_median = median(gap_filled_months, na.rm = TRUE),
-    .groups    = "drop"
-  )
-
-message("\n=== Descriptive statistics ===")
-print(df_desc, width = Inf)
-
+# df_filtered <- df_sample |>
+#   dplyr::filter(gap_filled_months <= 6)
 
 # ---- Boxplot ----------------------------------------------------------------
 
-p_box <- ggplot(
-  df_filtered,
-  aes(x = class, y = cwd_max, fill = class)) +
-  geom_boxplot(outlier.size = 0.3, outlier.alpha = 0.2) +
-  scale_fill_viridis_d(option = "D", end = 0.85) +
+plot_land_use <- ggplot(
+  data = df_filtered,
+  aes(x = class, y = cwd_max)) +
+  geom_boxplot(outlier.size = 0.3, outlier.alpha = 0.2, fill = "grey85") +
   labs(
     x = NULL,
-    y = expression(paste(CWD[max], " (mm)"))
+    y = "CWD_max [mm]",
+    title = "CWD_max Distribution by Land use Type"
   ) +
   theme_classic() +
   theme(legend.position = "none")
 
 ggsave(
   here("fig", "h4_land_use_boxplot.pdf"),
-  plot   = p_box,
+  plot   = plot_land_use,
   width  = 12,
   height = 10,
   units  = "cm"
 )
 
-
-# ---- Density plot -----------------------------------------------------------
-
-p_dens <- ggplot(
-  df_filtered,
-  aes(x = cwd_max, fill = class, colour = class)) +
-  geom_density(alpha = 0.4) +
-  scale_fill_viridis_d(option = "D", end = 0.85, name = NULL) +
-  scale_colour_viridis_d(option = "D", end = 0.85, name = NULL) +
-  labs(
-    x = expression(paste(CWD[max], " (mm)")),
-    y = "Density"
-  ) +
-  theme_classic() +
-  theme(legend.position = c(0.75, 0.80))
-
 ggsave(
-  here("fig", "h4_land_use_density.pdf"),
-  plot   = p_dens,
+  here("fig", "h4_land_use_boxplot.png"),
+  plot   = plot_land_use,
   width  = 12,
-  height = 8,
-  units  = "cm"
+  height = 10,
+  units  = "cm",
+  dpi    = 600   # oder 600 für noch schärfer
 )
 
 message("\nFigures saved to fig/")

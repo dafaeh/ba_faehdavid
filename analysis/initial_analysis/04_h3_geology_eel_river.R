@@ -22,8 +22,8 @@
 #
 # Outputs:
 #   - data/h3_eel_river_pixels.csv
-#   - fig/h3_eel_river_boxplot.pdf
-#   - fig/h3_eel_river_density.pdf
+#   - fig/h3_eel_river_boxplot.pdf / .png
+#   - fig/h3_eel_river_density.pdf / .png
 
 
 # ---- Setup ------------------------------------------------------------------
@@ -37,8 +37,18 @@ library(here)
 
 set.seed(42)
 
+# Wong-palette colours shared with 05_h3_cwd_dry_elder.R so that the
+# Coastal Belt / Central Belt distinction is encoded identically across figures.
+geo_cols <- c("Coastal Belt (TK)"  = "#009E73",
+              "Central Belt (KJf)" = "#D55E00")
+
 
 # ---- Load raster ------------------------------------------------------------
+
+stopifnot(
+  "CWD raster not found. Place eel_3ref.tif in data/." =
+    file.exists(here("data", "eel_3ref.tif"))
+)
 
 r      <- terra::rast(here("data", "eel_3ref.tif"))
 r_cwd  <- r[["cwd_max"]]
@@ -145,13 +155,11 @@ p_box <- ggplot(
   df_sample,
   aes(x = geo_class, y = cwd_max, fill = geo_class)) +
   geom_boxplot(outlier.size = 0.3, outlier.alpha = 0.2) +
-  scale_fill_manual(
-    values = c("Coastal Belt (TK)"  = "#2166ac",
-               "Central Belt (KJf)" = "#d6604d")
-  ) +
+  scale_fill_manual(values = geo_cols) +
   labs(
-    x = NULL,
-    y = expression(paste(CWD[max], " (mm)"))
+    x     = NULL,
+    y     = expression(CWD[max]~"(mm)"),
+    title = "CWD_max Distribution by Geological Formation"
   ) +
   theme_classic() +
   theme(legend.position = "none")
@@ -159,41 +167,17 @@ p_box <- ggplot(
 ggsave(
   here("fig", "h3_eel_river_boxplot.pdf"),
   plot   = p_box,
-  width  = 10,
+  width  = 12,
   height = 10,
   units  = "cm"
 )
-
-
-# ---- Density plot -----------------------------------------------------------
-
-p_dens <- ggplot(
-  df_sample,
-  aes(x = cwd_max, fill = geo_class, colour = geo_class)) +
-  geom_density(alpha = 0.4) +
-  scale_fill_manual(
-    values = c("Coastal Belt (TK)"  = "#2166ac",
-               "Central Belt (KJf)" = "#d6604d"),
-    name   = NULL
-  ) +
-  scale_colour_manual(
-    values = c("Coastal Belt (TK)"  = "#2166ac",
-               "Central Belt (KJf)" = "#d6604d"),
-    name   = NULL
-  ) +
-  labs(
-    x = expression(paste(CWD[max], " (mm)")),
-    y = "Density"
-  ) +
-  theme_classic() +
-  theme(legend.position = c(0.8, 0.8))
-
 ggsave(
-  here("fig", "h3_eel_river_density.pdf"),
-  plot   = p_dens,
+  here("fig", "h3_eel_river_boxplot.png"),
+  plot   = p_box,
   width  = 12,
-  height = 8,
-  units  = "cm"
+  height = 10,
+  units  = "cm",
+  dpi    = 600
 )
 
 message("\nFigures saved to fig/")

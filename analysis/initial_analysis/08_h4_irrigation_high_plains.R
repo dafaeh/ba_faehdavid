@@ -9,7 +9,7 @@
 # LANID 2017 is used as a proxy for irrigation status during the 2020-2022
 # CWD analysis period. The dataset does not distinguish between land-cover
 # types: irrigated pixels may include crops, hay, pasture, and golf courses.
-# A land-cover-controlled comparison is provided in 07_h4_cropland_irrigation.R.
+# A land-cover-controlled comparison is provided in 09_h4_cropland_irrigation.R.
 #
 # Expected direction (H4): Irrigated > Non-irrigated.
 # Rationale: irrigation supplements precipitation, allowing crops to
@@ -19,7 +19,7 @@
 # Outputs:
 #   - data/h4_test2_samples.csv
 #   - fig/h4_irrigation_boxplot.pdf
-#   - fig/h4_irrigation_density.pdf
+#   - fig/h4_irrigation_boxplot.png
 
 
 # ---- Setup ------------------------------------------------------------------
@@ -122,75 +122,43 @@ readr::write_csv(df_sample, here("data", "h4_test2_samples.csv"))
 
 # ---- Quality filter ---------------------------------------------------------
 
-# Drop pixels where more than 6 of the 36 analysis months were gap-filled;
-# these have a less reliable CWDmax.
-df_filtered <- df_sample |>
-  dplyr::filter(gap_filled_months <= 6)
+df_filtered <- df_sample
 
+# Eventually drop pixels with too many gap-filled months, for example:
 
-# ---- Descriptive statistics -------------------------------------------------
-
-df_desc <- df_filtered |>
-  dplyr::group_by(class) |>
-  dplyr::summarise(
-    n          = dplyr::n(),
-    median_mm  = median(cwd_max),
-    mean_mm    = mean(cwd_max),
-    sd_mm      = sd(cwd_max),
-    q25_mm     = quantile(cwd_max, 0.25),
-    q75_mm     = quantile(cwd_max, 0.75),
-    gap_median = median(gap_filled_months, na.rm = TRUE),
-    .groups    = "drop"
-  )
-
-message("\n=== Descriptive statistics ===")
-print(df_desc, width = Inf)
+# df_filtered <- df_sample |>
+#   dplyr::filter(gap_filled_months <= 6)
 
 
 # ---- Boxplot ----------------------------------------------------------------
 
-p_box <- ggplot(
-  df_filtered,
-  aes(x = class, y = cwd_max, fill = class)) +
-  geom_boxplot(outlier.size = 0.3, outlier.alpha = 0.2) +
-  scale_fill_viridis_d(option = "D", end = 0.85) +
+plot_irrigation <- ggplot(
+  data = df_filtered,
+  aes(x = class, y = cwd_max)) +
+  geom_boxplot(outlier.size = 0.3, outlier.alpha = 0.2, fill = "grey85") +
   labs(
     x = NULL,
-    y = expression(paste(CWD[max], " (mm)"))
+    y = "CWD_max [mm]",
+    title = "CWD_max Distribution by Irrigation Status"
   ) +
   theme_classic() +
   theme(legend.position = "none")
 
 ggsave(
   here("fig", "h4_irrigation_boxplot.pdf"),
-  plot   = p_box,
-  width  = 10,
+  plot   = plot_irrigation,
+  width  = 12,
   height = 10,
   units  = "cm"
 )
 
-
-# ---- Density plot -----------------------------------------------------------
-
-p_dens <- ggplot(
-  df_filtered,
-  aes(x = cwd_max, fill = class, colour = class)) +
-  geom_density(alpha = 0.4) +
-  scale_fill_viridis_d(option = "D", end = 0.85, name = NULL) +
-  scale_colour_viridis_d(option = "D", end = 0.85, name = NULL) +
-  labs(
-    x = expression(paste(CWD[max], " (mm)")),
-    y = "Density"
-  ) +
-  theme_classic() +
-  theme(legend.position = c(0.8, 0.8))
-
 ggsave(
-  here("fig", "h4_irrigation_density.pdf"),
-  plot   = p_dens,
+  here("fig", "h4_irrigation_boxplot.png"),
+  plot   = plot_irrigation,
   width  = 12,
-  height = 8,
-  units  = "cm"
+  height = 10,
+  units  = "cm",
+  dpi    = 600
 )
 
 message("\nFigures saved to fig/")
