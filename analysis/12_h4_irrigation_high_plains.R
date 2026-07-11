@@ -1,6 +1,7 @@
 # 12_h4_irrigation_high_plains.R
 # Tests H4 for the High Plains focus region: does CWDmax differ between
 # irrigated and non-irrigated land?
+# The classes are: Irrigated and Non-irrigated (LANID 2017)
 
 # ---- Setup ------------------------------------------------------------------
 library(terra)
@@ -12,24 +13,16 @@ library(here)
 set.seed(42)
 
 
-# Load CWD raster
+# Load CWD and LANID
+
 r     <- terra::rast(here("data", "high_plains_9ref.tif"))
 r_cwd <- r[["cwd_max"]]
 
-
-# Load LANID
 stack_pre     <- terra::rast(here("data", "stack_high_plains.tif"))
 lanid_aligned <- stack_pre[["lanid"]]
 
-
-# Reduce LANID to two classes Irrigated and Non-irrigated
-lanid_class <- terra::classify(
-  lanid_aligned,
-  rcl    = matrix(c(1, 1,
-                    0, 2),
-                  ncol = 2, byrow = TRUE),
-  others = NA
-)
+# LANID is binary (1 = Irrigated, 0 = Non-irrigated)
+lanid_class <- lanid_aligned
 names(lanid_class) <- "class"
 
 
@@ -57,7 +50,7 @@ df_sample <- dplyr::tibble(
   dplyr::mutate(
     class = factor(
       class,
-      levels = c(1, 2),
+      levels = c(1, 0),
       labels = c("Irrigated", "Non-irrigated")
     )
   ) |>

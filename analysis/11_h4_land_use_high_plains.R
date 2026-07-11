@@ -13,13 +13,10 @@ library(here)
 set.seed(42)
 
 
-# Load CWD raster
-
+# Load CWD and NLCD
 r     <- terra::rast(here("data", "high_plains_9ref.tif"))
 r_cwd <- r[["cwd_max"]]
 
-
-# Load NLCD 
 stack_pre <- terra::rast(here("data", "stack_high_plains.tif"))
 nlcd      <- stack_pre[["nlcd"]]
 
