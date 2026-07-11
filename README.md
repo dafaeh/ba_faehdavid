@@ -1,5 +1,4 @@
-# Bachelor Thesis: High-Resolution Mapping of Cumulative Water Deficits across 
-the Contiguous United States
+# Bachelor Thesis: High-Resolution Mapping of Cumulative Water Deficits across the Contiguous United States
 
 **Degree program:** Geography
 
