@@ -73,7 +73,7 @@ df_pixels   <- dplyr::filter(df_pixels, is.na(lanid) | lanid != 1)
 
 
 # Sample
-n_sample <- 500000
+n_sample <- 100000
 
 df_sample <- df_pixels |>
   dplyr::group_by(geo_class) |>

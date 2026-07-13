@@ -53,7 +53,7 @@ geo_rast <- terra::mask(geo_rast, lanid, maskvalue = 1)
 # Stratified sample 
 # Per-class n_sample, not area-proportional: ensures Clastic and Carbonate
 # are comparably represented for the H3 group comparison.
-n_sample <- 500000
+n_sample <- 100000
 
 sample_pts <- terra::spatSample(
   geo_rast,

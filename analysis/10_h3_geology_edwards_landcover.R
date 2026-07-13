@@ -14,7 +14,7 @@ library(here)
 
 set.seed(42)
 
-n_per_class <- 500000   # stratified sample per geology class (before veg split)
+n_per_class <- 100000   # stratified sample per geology class (before veg split)
 gap_max     <- 6       # max gap-filled months to keep a pixel
 
 

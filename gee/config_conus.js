@@ -162,8 +162,6 @@ exports.SPINUP_YEAR    = 2019;
 exports.ANALYSIS_YEARS = [2020, 2021, 2022];
 
 // -- Reference years ----------------------------------------------------------
-// Broader baseline than config.js to maximise gap-fill coverage across
-// the full CONUS domain where persistent Landsat gaps are more frequent.
 exports.REFERENCE_YEARS = [2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024];
 
 // -- Snow model parameters ----------------------------------------------------

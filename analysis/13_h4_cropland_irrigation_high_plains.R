@@ -1,6 +1,7 @@
 # 13_h4_cropland_irrigation_high_plains.R
 # Tests H4 for the High Plains focus region: does CWDmax differ between
 # irrigated and rainfed cropland?
+# The classes are: Cropland irrigated and Cropland rainfed (NLCD 82 x LANID)
 
 # ---- Setup ------------------------------------------------------------------
 library(terra)
@@ -11,36 +12,34 @@ library(here)
 
 set.seed(42)
 
+# Load CWD, NLCD and LANID
 
-# Load CWD raster
 r     <- terra::rast(here("data", "high_plains_9ref.tif"))
 r_cwd <- r[["cwd_max"]]
 
-
-# Load NLCD and LANID
-stack_pre     <- terra::rast(here("data", "stack_high_plains.tif"))
-nlcd_aligned  <- stack_pre[["nlcd"]]
-lanid_aligned <- stack_pre[["lanid"]]
-
+stack_pre <- terra::rast(here("data", "stack_high_plains.tif"))
+nlcd      <- stack_pre[["nlcd"]]
+lanid     <- stack_pre[["lanid"]]
 
 # Combine NLCD and LANID into two classes Cropland irrigated and Cropland rainfed
-cropland_mask <- nlcd_aligned == 82
+cropland <- nlcd == 82
 
-class_img <- terra::ifel(
-  cropland_mask & lanid_aligned == 1, 1,
+crop_lanid_aligned <- terra::ifel(
+  cropland & lanid == 1, 1,
   terra::ifel(
-    cropland_mask & lanid_aligned == 0, 2,
+    cropland & lanid == 0, 0,
     NA
   )
 )
-names(class_img) <- "class"
-
+names(crop_lanid_aligned) <- "class"
 
 # Stratified sample
-n_sample <- 500000
+# Irrigated and rainfed cropland end up comparably represented for the H4
+# group comparison, despite different areal shares.
+n_sample <- 100000
 
 sample_pts <- terra::spatSample(
-  class_img,
+  crop_lanid_aligned,
   size   = n_sample,
   method = "stratified",
   na.rm  = TRUE,
@@ -60,12 +59,11 @@ df_sample <- dplyr::tibble(
   dplyr::mutate(
     class = factor(
       class,
-      levels = c(1, 2),
+      levels = c(1, 0),
       labels = c("Cropland irrigated", "Cropland rainfed")
     )
   ) |>
   dplyr::filter(!is.na(cwd_max))
-
 
 # ---- Quality filter ---------------------------------------------------------
 

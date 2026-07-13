@@ -12,25 +12,31 @@ library(here)
 
 set.seed(42)
 
-
 # Load CWD and LANID
 
 r     <- terra::rast(here("data", "high_plains_9ref.tif"))
 r_cwd <- r[["cwd_max"]]
 
-stack_pre     <- terra::rast(here("data", "stack_high_plains.tif"))
-lanid_aligned <- stack_pre[["lanid"]]
+stack_pre <- terra::rast(here("data", "stack_high_plains.tif"))
+lanid     <- stack_pre[["lanid"]]
 
-# LANID is binary (1 = Irrigated, 0 = Non-irrigated)
-lanid_class <- lanid_aligned
-names(lanid_class) <- "class"
-
+# Reduce LANID to two classes Irrigated and Non-irrigated
+lanid_aligned <- terra::classify(
+  lanid,
+  rcl    = matrix(c(1, 1,
+                    0, 0),
+                  ncol = 2, byrow = TRUE),
+  others = NA
+)
+names(lanid_aligned) <- "class"
 
 # Stratified sample
-n_sample <- 500000
+# Irrigated and Non-irrigated end up comparably represented for the H4
+# group comparison, despite different areal shares.
+n_sample <- 100000
 
 sample_pts <- terra::spatSample(
-  lanid_class,
+  lanid_aligned,
   size   = n_sample,
   method = "stratified",
   na.rm  = TRUE,
@@ -55,7 +61,6 @@ df_sample <- dplyr::tibble(
     )
   ) |>
   dplyr::filter(!is.na(cwd_max))
-
 
 # ---- Quality filter ---------------------------------------------------------
 

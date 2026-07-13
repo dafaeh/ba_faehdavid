@@ -36,7 +36,7 @@ names(nlcd_aligned) <- "class"
 # Stratified sample
 # Cropland, Grassland, and Shrub/Scrub end up comparably represented for the H4 
 # group comparison, despite different areal shares.
-n_sample <- 500000
+n_sample <- 100000
 
 sample_pts <- terra::spatSample(
   nlcd_aligned,
