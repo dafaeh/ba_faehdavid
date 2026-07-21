@@ -1,6 +1,9 @@
 # 05_shading_artefact_eel.R
 # Provides evidence that a topographic shading artefact in DisALEXI prevents
 # robust testing of H1 and H2 in the Eel River focus region.
+#
+# Restricted to eel_shading_subset, used to test sensitivity to shading
+# effects on DisALEXI ET (see Risks and Contingency in the proposal).
 
 # DisALEXI derives ET from land surface temperature (LST): low LST is
 # interpreted as high ET via evaporative cooling. Topographic shading reduces
@@ -30,10 +33,28 @@ aspect_colours <- c(
 cwd       <- terra::rast(here("data", "eel_9ref.tif"))[["cwd_max"]]
 
 stack_pre <- terra::rast(here("data", "stack_eel.tif"))
+
+# ---- Restrict to eel_shading_subset ------------------------------------------
+aoi_wgs84 <- sf::st_polygon(list(matrix(
+  c(-123.73946585911666, 39.301773660163114,
+    -122.94845023411666, 39.301773660163114,
+    -122.94845023411666, 41.2957488509508,
+    -123.73946585911666, 41.2957488509508,
+    -123.73946585911666, 39.301773660163114),
+  ncol = 2, byrow = TRUE
+))) |>
+  sf::st_sfc(crs = "EPSG:4326")
+
+aoi_5070 <- sf::st_transform(aoi_wgs84, "EPSG:5070")
+
+cwd       <- terra::crop(cwd, terra::vect(aoi_5070))
+stack_pre <- terra::crop(stack_pre, terra::vect(aoi_5070))
+
 elevation <- stack_pre[["elevation"]]
 twi       <- stack_pre[["twi"]]
 northness <- stack_pre[["northness"]]
 slope     <- stack_pre[["slope"]]
+nlcd      <- stack_pre[["nlcd"]]
 lanid     <- stack_pre[["lanid"]]
 
 # ---- Sample -----------------------------------------------------------------
@@ -52,6 +73,8 @@ df_raw <- terra::spatSample(
 
 # Exclude irrigated pixels using the LANID raster
 df_raw$lanid <- terra::extract(lanid, as.matrix(df_raw[, c("x", "y")]))$lanid
+# NLCD land cover, extracted here for the forest filter used in Plot 6.
+df_raw$nlcd  <- terra::extract(nlcd, as.matrix(df_raw[, c("x", "y")]))$nlcd
 n_irrigated  <- sum(df_raw$lanid == 1, na.rm = TRUE)
 
 # Derive classification variables used in the plots below:
@@ -86,28 +109,27 @@ df <- df_raw |>
 
 # ---- Plot 1: CWDmax vs northness --------------------------------------------
 plot_northness_eel <- ggplot(
-  data = df, 
+  data = df,
   aes(x = northness, y = cwd_max)) +
-  geom_point(alpha = 0.04, size = 0.3, colour = "grey40") +
-  geom_smooth(method = "lm", colour = "firebrick", linewidth = 0.9) +
+  geom_hex(bins = 60) +
+  scale_fill_viridis_c(trans = "log10", name = "n (log10)") +
+  geom_smooth(method = "lm", formula = y ~ x,
+              se = FALSE, colour = "red", linewidth = 0.9) +
   labs(
-    x       = "Northness (cos aspect) from south to north",
-    y       = "CWD_max [mm]",
-    title   = "CWD_max by northness",
-    caption = "+96mm in CWD_max per unit northness"
-  ) +
+    x = "Northness (cos aspect) from south to north",
+    y = expression(CWD[max]~"[mm]")) +
   theme_classic()
 
 # Save plot
 ggsave(
-  filename = here("fig", "h2_eel_shading.pdf"),
+  filename = here("fig", "h2_eel_cwd_by_northness_subset.pdf"),
   plot     = plot_northness_eel,
   width    = 16,
   height   = 12,
   units    = "cm"
 )
 ggsave(
-  filename = here("fig", "h2_eel_shading.png"),
+  filename = here("fig", "h2_eel_cwd_by_northness_subset.png"),
   plot     = plot_northness_eel,
   width    = 16,
   height   = 12,
@@ -117,28 +139,26 @@ ggsave(
 
 # ---- Plot 2: TWI vs CWDmax by aspect ----------------------------------------
 plot_aspect_eel <- ggplot(
-  data = df, 
+  data = df,
   aes(x = twi, y = cwd_max, colour = aspect_class)) +
   geom_point(alpha = 0.04, size = 0.4) +
   geom_smooth(method = "lm", se = FALSE, linewidth = 0.9) +
   scale_colour_manual(values = aspect_colours, name = "Aspect") +
   labs(
-    x     = "TWI",
-    y     = "CWD_max [mm]",
-    title = "TWI vs CWDmax by aspect (Eel River)"
-  ) +
+    x = "TWI",
+    y = expression(CWD[max]~"[mm]")) +
   theme_classic() +
   theme(legend.position = "top")
 
 ggsave(
-  filename = here("fig", "h2_eel_cwd_aspect.pdf"),
+  filename = here("fig", "h2_eel_cwd_aspect_subset.pdf"),
   plot     = plot_aspect_eel,
   width    = 16,
   height   = 12,
   units    = "cm"
 )
 ggsave(
-  filename = here("fig", "h2_eel_cwd_aspect.png"),
+  filename = here("fig", "h2_eel_cwd_aspect_subset.png"),
   plot     = plot_aspect_eel,
   width    = 16,
   height   = 12,
@@ -147,6 +167,12 @@ ggsave(
 )
 
 # ---- Plot 3: slope x aspect -------------------------------------------------
+# Fixed y-axis limits for cross-region comparability with Plot 3 in
+# 06_shading_artefact_appalachia.R. Eel River has the wider mean_cwd
+# range, so it sets the bounds for both plots. Values from
+# range(mean_cwd) below.
+SHARED_Y_LIMITS_SLOPE_ASPECT <- c(137.7566, 810.8651)
+
 plot_slope_aspect <- df |>
   group_by(aspect_class, slope_class) |>
   summarise(mean_cwd = mean(cwd_max, na.rm = TRUE), .groups = "drop") |>
@@ -155,23 +181,23 @@ plot_slope_aspect <- df |>
   geom_line(linewidth = 1) +
   geom_point(size = 3) +
   scale_colour_manual(values = aspect_colours, name = "Aspect") +
+  scale_x_discrete(limits = rev) +
+  coord_cartesian(ylim = SHARED_Y_LIMITS_SLOPE_ASPECT) +
   labs(
     x       = "Slope class",
-    y       =  "CWD_max [mm]",
-    title   = "CWDmax by slope grouped by aspect"
-  ) +
+    y       = expression(CWD[max]~"[mm]")) +
   theme_classic() +
   theme(legend.position = "top")
 
 ggsave(
-  filename = here("fig", "h2_eel_slope_aspect.pdf"),
+  filename = here("fig", "h2_eel_slope_aspect_subset.pdf"),
   plot     = plot_slope_aspect,
   width    = 16,
   height   = 12,
   units    = "cm"
 )
 ggsave(
-  filename = here("fig", "h2_eel_slope_aspect.png"),
+  filename = here("fig", "h2_eel_slope_aspect_subset.png"),
   plot     = plot_slope_aspect,
   width    = 16,
   height   = 12,
@@ -188,24 +214,23 @@ plot_slope_elev <- df |>
   summarise(mean_slope = mean(slope, na.rm = TRUE), .groups = "drop") |>
   ggplot(
     aes(x = elev_band, y = mean_slope, group = 1)) +
-    geom_line(linewidth = 1, colour = "grey30") +
-    geom_point(size = 3, colour = "grey30") +
-    labs(
-      x       = "Elevation band (low to high)",
-      y       = "Mean slope (degrees)",
-      title   = "Slope by Elevation Bands") +
+  geom_line(linewidth = 1, colour = "grey30") +
+  geom_point(size = 3, colour = "grey30") +
+  labs(
+    x = "Elevation band (low to high)",
+    y = "Mean slope (degrees)") +
   theme_classic() +
   theme(axis.text.x = element_text(angle = 35, hjust = 1, size = 8))
 
 ggsave(
-  filename = here("fig", "h2_eel_slope_by_elev.pdf"),
+  filename = here("fig", "h2_eel_slope_by_elev_subset.pdf"),
   plot     = plot_slope_elev,
   width    = 16,
   height   = 12,
   units    = "cm"
 )
 ggsave(
-  filename = here("fig", "h2_eel_slope_by_elev.png"),
+  filename = here("fig", "h2_eel_slope_by_elev_subset.png"),
   plot     = plot_slope_elev,
   width    = 16,
   height   = 12,
@@ -215,7 +240,7 @@ ggsave(
 
 # ---- Plot 5: CWDmax by slope class ------------------------------------------
 plot_cwd_slope_class <- ggplot(
-  data = df, 
+  data = df,
   aes(x = slope_class, y = cwd_max, fill = slope_class)) +
   geom_boxplot(outlier.alpha = 0.05, outlier.size = 0.5) +
   scale_fill_manual(
@@ -226,22 +251,20 @@ plot_cwd_slope_class <- ggplot(
     )
   ) +
   labs(
-    x       = "Slope class",
-    y       = "CWD_max [mm]",
-    title   = "CWDmax by slope class",
-  ) +
+    x = "Slope class",
+    y = expression(CWD[max]~"[mm]")) +
   theme_classic() +
   theme(legend.position = "none")
 
 ggsave(
-  filename = here("fig", "h2_eel_cwd_by_slope.pdf"),
+  filename = here("fig", "h2_eel_cwd_by_slope_subset.pdf"),
   plot     = plot_cwd_slope_class,
   width    = 16,
   height   = 12,
   units    = "cm"
 )
 ggsave(
-  filename = here("fig", "h2_eel_cwd_by_slope.png"),
+  filename = here("fig", "h2_eel_cwd_by_slope_subset.png"),
   plot     = plot_cwd_slope_class,
   width    = 16,
   height   = 12,
@@ -249,73 +272,77 @@ ggsave(
   dpi      = 600
 )
 
-# ---- Plot 6: TWI vs CWDmax, south-facing only, Coastal Belt (TK) -----------
-# Only high quality pixels are used for this plot. The region of the Coastal Belt 
-# is relatively homogenous in terms of vegetation and geology. Only including south-facing
-# pixels ensures that only the pixels least affected by the shading bias are used.
+# ---- Plot 6: TWI vs CWDmax, south-facing forest only ------------------------
+# Only high quality pixels are used for this plot. Restricting to south-facing
+# pixels (the aspect class least affected by the shading bias) and to forest
+# (NLCD 2019 codes 41/42/43) holds aspect and land cover constant.
 
-# Filter for Coastal Belt pixels only
-coastal_belt <- sf::st_read(here("data", "geology_eel.gpkg"), quiet = TRUE) |>
-  dplyr::filter(ORIG_LABEL == "TK")
-
-# Cropping directly with a SpatVector (crop(stack, terra::vect(polygon)))
-# triggered std::bad_alloc in this setup. Fix: crop with the numeric extent
-# first, mask with the polygon after.
-bbox_coastal  <- terra::ext(coastal_belt)
-stack_coastal <- c(cwd, twi, northness, lanid)
-names(stack_coastal) <- c("cwd_max", "twi", "northness", "lanid")
-stack_coastal <- terra::crop(stack_coastal, bbox_coastal)
-stack_coastal <- terra::mask(stack_coastal, terra::vect(coastal_belt))
-
-# extract() with the polygon reads only cells inside the Coastal Belt
-# geometry, without first allocating a full bounding-box rectangle.
-df_coastal_raw <- terra::extract(
-  stack_coastal, terra::vect(coastal_belt), xy = TRUE
-) |>
-  tidyr::drop_na(cwd_max, twi, northness, lanid) |>
-  tibble::as_tibble()
-
-# Remove irrigated pixels and filter for south facing only
-n_irrigated_coastal <- sum(df_coastal_raw$lanid == 1, na.rm = TRUE)
-
-df_coastal <- df_coastal_raw |>
-  dplyr::filter(is.na(lanid) | lanid != 1) |>
-  dplyr::mutate(
-    aspect_class = cut(
-      northness,
-      breaks         = c(-1, -0.33, 0.33, 1),
-      labels         = c("south-facing", "east/west", "north-facing"),
-      include.lowest = TRUE
-    )
-  ) |>
+df_south_forest <- df |>
+  dplyr::filter(nlcd %in% c(41, 42, 43)) |>   # deciduous/evergreen/mixed forest
   dplyr::filter(aspect_class == "south-facing")
 
 # Plot
-plot_twi_coastal_south <- ggplot(
-  data = df_coastal,
+plot_twi_forest_south <- ggplot(
+  data = df_south_forest,
   aes(x = twi, y = cwd_max)) +
   geom_hex(bins = 60) +
   scale_fill_viridis_c(trans = "log10", name = "n (log10)") +
   geom_smooth(method = "lm", formula = y ~ x,
               se = FALSE, colour = "red", linewidth = 0.9) +
   labs(
-    x     = "TWI",
-    y     = "CWD_max [mm]",
-    title = "TWI vs CWDmax, south-facing only (Coastal Belt, TK)"
-  ) +
+    x = "TWI",
+    y = expression(CWD[max]~"[mm]")) +
   theme_classic()
 
 # Save plot
 ggsave(
-  filename = here("fig", "h2_eel_twi_coastal_south.pdf"),
-  plot     = plot_twi_coastal_south,
+  filename = here("fig", "h2_eel_twi_forest_south_subset.pdf"),
+  plot     = plot_twi_forest_south,
   width    = 16,
   height   = 12,
   units    = "cm"
 )
 ggsave(
-  filename = here("fig", "h2_eel_twi_coastal_south.png"),
-  plot     = plot_twi_coastal_south,
+  filename = here("fig", "h2_eel_twi_forest_south_subset.png"),
+  plot     = plot_twi_forest_south,
+  width    = 16,
+  height   = 12,
+  units    = "cm",
+  dpi      = 600
+)
+
+# ---- Plot 7: TWI vs CWDmax, forest only, all aspects pooled -----------------
+# Test whether the shading bias is also present, when all aspects are pooled.
+# Reuses the shared df (already forest-filterable via nlcd), unlike the
+# Appalachia counterpart which re-samples independently for the larger region.
+
+df_forest_pooled <- df |>
+  dplyr::filter(nlcd %in% c(41, 42, 43))   # deciduous/evergreen/mixed forest
+
+# Plot
+plot_twi_forest_pooled <- ggplot(
+  data = df_forest_pooled,
+  aes(x = twi, y = cwd_max)) +
+  geom_hex(bins = 60) +
+  scale_fill_viridis_c(trans = "log10", name = "n (log10)") +
+  geom_smooth(method = "lm", formula = y ~ x,
+              se = FALSE, colour = "red", linewidth = 0.9) +
+  labs(
+    x = "TWI",
+    y = expression(CWD[max]~"[mm]")) +
+  theme_classic()
+
+# Save plot
+ggsave(
+  filename = here("fig", "h2_eel_twi_forest_pooled_subset.pdf"),
+  plot     = plot_twi_forest_pooled,
+  width    = 16,
+  height   = 12,
+  units    = "cm"
+)
+ggsave(
+  filename = here("fig", "h2_eel_twi_forest_pooled_subset.png"),
+  plot     = plot_twi_forest_pooled,
   width    = 16,
   height   = 12,
   units    = "cm",

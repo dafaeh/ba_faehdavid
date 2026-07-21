@@ -134,10 +134,8 @@ p <- ggplot(df, aes(x = veg_class, y = cwd_max, fill = geo_class)) +
   scale_fill_manual(values = geo_cols, name = NULL) +
   facet_wrap(~ veg_class, scales = "free_x", nrow = 1) +
   labs(
-    x       = NULL,
-    y       = expression(CWD[max]~"(mm)"),
-    title   = "CWD_max Distribution by Vegetation Class and Geological Substrate",
-    caption = "Irrigated pixels are excluded."
+    x = NULL,
+    y = expression(CWD[max]~"(mm)")
   ) +
   theme_classic() +
   theme(

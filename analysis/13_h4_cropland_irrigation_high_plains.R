@@ -81,9 +81,7 @@ plot_cropland_irrigation <- ggplot(
   geom_boxplot(outlier.size = 0.3, outlier.alpha = 0.2, fill = "grey85") +
   labs(
     x = NULL,
-    y = "CWD_max [mm]",
-    title = "CWD_max Distribution by Irrigation Status within Cropland"
-  ) +
+    y = expression(CWD[max]~"[mm]")) +
   theme_classic() +
   theme(legend.position = "none")
 

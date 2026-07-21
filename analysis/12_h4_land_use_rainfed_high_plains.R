@@ -1,42 +1,48 @@
-# 12_h4_irrigation_high_plains.R
-# Tests H4 for the High Plains focus region: does CWDmax differ between
-# irrigated and non-irrigated land?
-# The classes are: Irrigated and Non-irrigated (LANID 2017)
+# 12_h4_land_use_rainfed_high_plains.R
+# Tests H4 for the High Plains focus region: does CWDmax differ across
+# land-use types when irrigation is excluded?
+# The classes are: Cropland rainfed, Grassland rainfed and Shrubland rainfed
+# (NLCD 82 / 71 / 52 restricted to LANID = 0)
 
 # ---- Setup ------------------------------------------------------------------
 library(terra)
 library(dplyr)
 library(ggplot2)
-library(readr)
 library(here)
 
 set.seed(42)
 
-# Load CWD and LANID
+# Load CWD, NLCD and LANID
 
-r     <- terra::rast(here("data", "high_plains_9ref.tif"))
-r_cwd <- r[["cwd_max"]]
+r <- terra::rast(here("data", "high_plains_9ref.tif"))
 
 stack_pre <- terra::rast(here("data", "stack_high_plains.tif"))
+nlcd      <- stack_pre[["nlcd"]]
 lanid     <- stack_pre[["lanid"]]
 
-# Reduce LANID to two classes Irrigated and Non-irrigated
-lanid_aligned <- terra::classify(
-  lanid,
-  rcl    = matrix(c(1, 1,
-                    0, 0),
+# Reduce NLCD to three classes and keep only rainfed pixels.
+# Pixels without LANID coverage are dropped too, their rainfed status is unknown.
+nlcd_classes <- terra::classify(
+  nlcd,
+  rcl    = matrix(c(82, 1,
+                    71, 2,
+                    52, 3),
                   ncol = 2, byrow = TRUE),
   others = NA
 )
-names(lanid_aligned) <- "class"
+
+is_irrigated <- lanid == 1
+
+class_rainfed <- terra::mask(nlcd_classes, is_irrigated, maskvalue = 1)
+names(class_rainfed) <- "class"
 
 # Stratified sample
-# Irrigated and Non-irrigated end up comparably represented for the H4
+# Cropland, Grassland, and Shrub/Scrub end up comparably represented for the H4
 # group comparison, despite different areal shares.
 n_sample <- 100000
 
 sample_pts <- terra::spatSample(
-  lanid_aligned,
+  class_rainfed,
   size   = n_sample,
   method = "stratified",
   na.rm  = TRUE,
@@ -56,8 +62,8 @@ df_sample <- dplyr::tibble(
   dplyr::mutate(
     class = factor(
       class,
-      levels = c(1, 0),
-      labels = c("Irrigated", "Non-irrigated")
+      levels = c(1, 2, 3),
+      labels = c("Cropland rainfed", "Grassland rainfed", "Shrubland rainfed")
     )
   ) |>
   dplyr::filter(!is.na(cwd_max))
@@ -72,29 +78,27 @@ df_filtered <- df_sample
 #   dplyr::filter(gap_filled_months <= 6)
 
 # Boxplot
-plot_irrigation <- ggplot(
+plot_land_use_rainfed <- ggplot(
   data = df_filtered,
   aes(x = class, y = cwd_max)) +
   geom_boxplot(outlier.size = 0.3, outlier.alpha = 0.2, fill = "grey85") +
   labs(
     x = NULL,
-    y = "CWD_max [mm]",
-    title = "CWD_max Distribution by Irrigation Status"
-  ) +
+    y = expression(CWD[max]~"[mm]")) +
   theme_classic() +
   theme(legend.position = "none")
 
 ggsave(
-  here("fig", "h4_irrigation_boxplot.pdf"),
-  plot   = plot_irrigation,
+  here("fig", "h4_2_land_use_rainfed.pdf"),
+  plot   = plot_land_use_rainfed,
   width  = 12,
   height = 10,
   units  = "cm"
 )
 
 ggsave(
-  here("fig", "h4_irrigation_boxplot.png"),
-  plot   = plot_irrigation,
+  here("fig", "h4_2_land_use_rainfed.png"),
+  plot   = plot_land_use_rainfed,
   width  = 12,
   height = 10,
   units  = "cm",

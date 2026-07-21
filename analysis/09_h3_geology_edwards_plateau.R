@@ -92,9 +92,7 @@ p_box <- ggplot(
   ) +
   labs(
     x = NULL,
-    y = "CWD_max [mm]", 
-    title = "CWD_max Distribution by Geological Substrate"
-  ) +
+    y     = expression(CWD[max]~"[mm]")) +
   theme_classic() +
   theme(legend.position = "none")
 

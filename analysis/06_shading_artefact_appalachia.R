@@ -85,27 +85,26 @@ df <- df_raw |>
 
 # ---- Plot 1: CWDmax vs northness --------------------------------------------
 plot_northness_appalachia <- ggplot(
-  data = df, 
+  data = df,
   aes(x = northness, y = cwd_max)) +
-  geom_point(alpha = 0.04, size = 0.3, colour = "grey40") +
-  geom_smooth(method = "lm", colour = "firebrick", linewidth = 0.9) +
+  geom_hex(bins = 60) +
+  scale_fill_viridis_c(trans = "log10", name = "n (log10)") +
+  geom_smooth(method = "lm", formula = y ~ x,
+              se = FALSE, colour = "red", linewidth = 0.9) +
   labs(
-    x       = "Northness (cos aspect) from south to north",
-    y       = "CWD_max [mm]",
-    title   = "CWD_max by northness",
-    caption = "CWD_max increases with northness if shading artefact is present"
-  ) +
+    x = "Northness (cos aspect) from south to north",
+    y = expression(CWD[max]~"[mm]")) +
   theme_classic()
 
 ggsave(
-  filename = here("fig", "h2_appalachia_shading.pdf"),
+  filename = here("fig", "h2_appalachia_cwd_by_northness.pdf"),
   plot     = plot_northness_appalachia,
   width    = 16,
   height   = 12,
   units    = "cm"
 )
 ggsave(
-  filename = here("fig", "h2_appalachia_shading.png"),
+  filename = here("fig", "h2_appalachia_cwd_by_northness.png"),
   plot     = plot_northness_appalachia,
   width    = 16,
   height   = 12,
@@ -122,9 +121,7 @@ plot_aspect_appalachia <- ggplot(
   scale_colour_manual(values = aspect_colours, name = "Aspect") +
   labs(
     x     = "TWI",
-    y     = "CWD_max [mm]",
-    title = "TWI vs CWDmax by aspect (Appalachians)"
-  ) +
+    y       = expression(CWD[max]~"[mm]")) +
   theme_classic() +
   theme(legend.position = "top")
 
@@ -145,19 +142,24 @@ ggsave(
 )
 
 # ---- Plot 3: slope x aspect ------------------------------------------------
+# Fixed y-axis limits for cross-region comparability with Plot 3 in
+# 05_shading_artefact_eel.R. Bounds taken from Eel River's
+# range(mean_cwd), which is wider than Appalachia's own range.
+SHARED_Y_LIMITS_SLOPE_ASPECT <- c(137.7566, 810.8651)
+
 plot_slope_aspect <- df |>
   group_by(aspect_class, slope_class) |>
   summarise(mean_cwd = mean(cwd_max, na.rm = TRUE), .groups = "drop") |>
   ggplot(
     aes(x = slope_class, y = mean_cwd, colour = aspect_class, group = aspect_class)) +
-    geom_line(linewidth = 1) +
-    geom_point(size = 3) +
-    scale_colour_manual(values = aspect_colours, name = "Aspect") +
-    labs(
-      x       = "Slope class",
-      y       =  "CWD_max [mm]",
-      title   = "CWDmax by slope grouped by aspect"
-  ) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 3) +
+  scale_colour_manual(values = aspect_colours, name = "Aspect") +
+  scale_x_discrete(limits = rev) +
+  coord_cartesian(ylim = SHARED_Y_LIMITS_SLOPE_ASPECT) +
+  labs(
+    x       = "Slope class",
+    y       = expression(CWD[max]~"[mm]")) +
   theme_classic() +
   theme(legend.position = "top")
 
@@ -185,13 +187,11 @@ plot_slope_elev <- df |>
   summarise(mean_slope = mean(slope, na.rm = TRUE), .groups = "drop") |>
   ggplot(
     aes(x = elev_band, y = mean_slope, group = 1)) +
-    geom_line(linewidth = 1, colour = "grey30") +
-    geom_point(size = 3, colour = "grey30") +
-    labs(
-      x       = "Elevation band (low to high)",
-      y       = "Mean slope (degrees)",
-      title   = "Slope by Elevation Bands"
-  ) +
+  geom_line(linewidth = 1, colour = "grey30") +
+  geom_point(size = 3, colour = "grey30") +
+  labs(
+    x       = "Elevation band (low to high)",
+    y       = "Mean slope [degrees]") +
   theme_classic() +
   theme(axis.text.x = element_text(angle = 35, hjust = 1, size = 8))
 
@@ -225,10 +225,7 @@ plot_cwd_slope_class <- ggplot(
   ) +
   labs(
     x       = "Slope class",
-    y       = "CWD_max [mm]",
-    title   = "CWDmax by slope class",
-    caption = "Outliers thinned for clarity (alpha = 0.05)."
-  ) +
+    y       = expression(CWD[max]~"[mm]")) +
   theme_classic() +
   theme(legend.position = "none")
 
@@ -256,19 +253,13 @@ ggsave(
 # land cover are both held constant. Complete TWI range (no additional
 # filtering).
 
-# Unlike the Eel River counterpart (05_shading_artefact_eel.R, Plot 6), which
-# restricts to a geological substrate via a polygon and extracts every pixel
-# inside it, the constraint here is a raster band (nlcd), not a polygon. There
-# is no small polygon to bound the read, so this block samples the region
-# rather than taking all pixels: a full as.data.frame() over the much larger
-# Appalachia stack exhausts memory (std::bad_alloc). A regular sample avoids
-# this and is dense enough for a hexbin. A larger sample than the shared
-# N_SAMPLE above is used because the forest + south-facing filters thin the
-# pixels substantially; regular sampling scales linearly with size (no
-# rejection-sampling resets), so the larger draw stays cheap.
-
-# This block re-samples independently (own stack incl. nlcd, own draw) so the
-# shared df feeding Plots 1-5 stays untouched.
+# The Eel River counterpart (05_shading_artefact_eel.R, Plot 6) applies the
+# same forest + south-facing filter, but reuses the shared df because its
+# subset is small. Here the region is much larger: a full as.data.frame()
+# over the Appalachia stack exhausts memory (std::bad_alloc), so this block
+# re-samples independently (own stack incl. nlcd, own draw) instead. A regular
+# sample avoids the memory blow-up and is dense enough for a hexbin. Sampling
+# independently also leaves the shared df feeding Plots 1-5 untouched.
 
 N_SAMPLE_FOREST <- 1000000
 
@@ -312,9 +303,7 @@ plot_twi_forest_south <- ggplot(
               se = FALSE, colour = "red", linewidth = 0.9) +
   labs(
     x     = "TWI",
-    y     = "CWD_max [mm]",
-    title = "TWI vs CWDmax, south-facing forest only (Appalachians)"
-  ) +
+    y       = expression(CWD[max]~"[mm]")) +
   theme_classic()
 
 ggsave(
@@ -369,9 +358,7 @@ plot_twi_forest_pooled <- ggplot(
               se = FALSE, colour = "red", linewidth = 0.9) +
   labs(
     x     = "TWI",
-    y     = "CWD_max [mm]",
-    title = "TWI vs CWDmax, forest only, all aspects pooled (Appalachians)"
-  ) +
+    y       = expression(CWD[max]~"[mm]")) +
   theme_classic()
 
 ggsave(
