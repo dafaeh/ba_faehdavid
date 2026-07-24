@@ -3,11 +3,29 @@
 // Edit SITES, SPINUP_YEAR, ANALYSIS_YEARS, and REFERENCE_YEARS between runs.
 
 
-// Study site geometries (WGS84). Add or remove sites here.
+// Study site geometries.
+//
+// Defined in EPSG:5070 (not WGS84) so that the AOI and the export region
+// are the same rectangle.
+
+// geodesic = false is required: without it GEE treats the edges as great
+// circles instead of straight lines in the projected CRS.
+
 exports.SITES = {
   eel: ee.Geometry.Rectangle(
-    [-123.74888168761035, 39.29196540299779,
-     -121.09019028136035, 41.29344890598067]
+    [-2337810, 2089020, -2060790, 2366130], 'EPSG:5070', false
+  ),
+
+  edwards_plateau: ee.Geometry.Rectangle(
+    [-418230, 635220, -19830, 1074360], 'EPSG:5070', false
+  ),
+
+  high_plains: ee.Geometry.Rectangle(
+    [-687480, 1476120, -115890, 1979370], 'EPSG:5070', false
+  ),
+
+  appalachia: ee.Geometry.Rectangle(
+    [994740, 1635390, 1519050, 2128530], 'EPSG:5070', false
   ),
 };
 
