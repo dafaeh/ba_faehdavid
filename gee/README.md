@@ -12,6 +12,11 @@ README for methodology and background.
 2. Adjust the `require()` paths (`users/dafaeh/ba_cwd:...`) to match your repo name.
 3. Check/adjust `config.js` (`SITES`, `ANALYSIS_YEARS`, `REFERENCE_YEARS, `EXPORT_FOLDER`).
 
+### Adding a region to the export
+Regions in `SITES` must be axis-aligned rectangles in EPSG:5070 with
+`geodesic = false` like in `config.js`. Rectangles drawn in the GEE Code Editor come out in WGS84 and
+have to be transformed to EPSG:5070 first.
+
 ## Run
 
 ### `main.js` for focus regions
