@@ -10,17 +10,23 @@
 library(terra)
 library(dplyr)
 library(ggplot2)
-library(readr)
 library(broom)
 library(here)
 library(mgcv)
 
+# annotate_lm() adds an R²/n/slope label to scatter/hexbin plots with a
+# trend line (see R/annotate_lm.R for the definition).
+# drop_irrigated() applies the project-wide LANID rule (see R/lanid_filter.R).
+# save_fig() writes each figure to fig/ as PDF and PNG (see R/save_fig.R).
+source(here("R", "annotate_lm.R"))
+source(here("R", "lanid_filter.R"))
+source(here("R", "save_fig.R"))
+
 set.seed(42) # Ensure reproducibility
 
 # Load data
-path_cwd    <- here("data", "eel_3ref.tif")
+path_cwd    <- here("data", "eel_9ref.tif")
 path_stack  <- here("data", "stack_eel.tif")
-path_pixels <- here("data", "h1_h2_eel_pixels.csv")
 
 # Define sample size
 n_sample    <- 1000000
@@ -47,13 +53,14 @@ df_full <- terra::spatSample(
   as.df  = TRUE
 )
 
-# Exclude irrigated pixels
-df_full$lanid <- terra::extract(lanid, df_full[, c("x", "y")])$lanid
-n_irrigated   <- sum(df_full$lanid == 1, na.rm = TRUE)
-df_full       <- dplyr::filter(df_full, is.na(lanid) | lanid != 1)
+# Exclude irrigated pixels and pixels without LANID coverage
+df_full$lanid <- terra::extract(lanid, as.matrix(df_full[, c("x", "y")]))$lanid
+df_full       <- drop_irrigated(df_full)
 
+# min() guards against the LANID filter leaving fewer than n_sample rows,
+# which slice_sample() would treat as an error.
 df <- df_full |>
-  dplyr::slice_sample(n = n_sample)
+  dplyr::slice_sample(n = min(n_sample, nrow(df_full)))
 
 # ---- Test H1: CWDmax vs. Elevation ------------------------------------------
 mod_h1 <- lm(cwd_max ~ elevation, data = df)
@@ -72,38 +79,28 @@ plot_elev_hex <- ggplot(df, aes(x = elevation, y = cwd_max)) +
     y       = expression(CWD[max]~"[mm]"))+
   theme_classic()
 
+# Add R²/n/slope label. Slope unit is mm CWDmax per m elevation.
+plot_elev_hex <- annotate_lm(plot_elev_hex, mod_h1, slope_unit = "mm/m")
+
 # Save plot
-ggsave(
-  filename = here("fig", "h1_elev_hex_eel.pdf"),
-  plot     = plot_elev_hex,
-  width    = 16,
-  height   = 12,
-  units    = "cm"
-)
-ggsave(
-  filename = here("fig", "h1_elev_hex_eel.png"),
-  plot     = plot_elev_hex,
-  width    = 16,
-  height   = 12,
-  units    = "cm",
-  dpi      = 600
-)
+save_fig(plot_elev_hex, "h1_elev_hex_eel")
 
 # ---- Restrict to eel_shading_subset (used for H2) ----------------------------
-aoi_wgs84 <- sf::st_polygon(list(matrix(
-  c(-123.73946585911666, 39.301773660163114,
-    -122.94845023411666, 39.301773660163114,
-    -122.94845023411666, 41.2957488509508,
-    -123.73946585911666, 41.2957488509508,
-    -123.73946585911666, 39.301773660163114),
-  ncol = 2, byrow = TRUE
-))) |>
-  sf::st_sfc(crs = "EPSG:4326")
+# Subset defined directly in EPSG:5070 (the CRS of the rasters), NOT as a
+# WGS84 rectangle. A WGS84 rectangle is a tilted quadrilateral in Albers,
+# and terra::crop() crops to a vector's *bounding box*, never to the
+# polygon itself -- so cropping with the transformed WGS84 rectangle would
+# take the axis-aligned box around the tilted shape, roughly twice the
+# intended area (the subset is narrow and tall, which maximises the effect).
+# These four numbers must stay identical to ext_subset in
+# 05_shading_artefact_eel.R and to subset_bbox in plot_focus_regions.R.
+ext_subset <- terra::ext(
+  -2336730, -2229380,   # xmin, xmax
+  2138000,  2366160    # ymin, ymax
+)
 
-aoi_5070 <- sf::st_transform(aoi_wgs84, "EPSG:5070")
-
-cwd_subset       <- terra::crop(cwd, terra::vect(aoi_5070))
-stack_pre_subset <- terra::crop(stack_pre, terra::vect(aoi_5070))
+cwd_subset       <- terra::crop(cwd, ext_subset)
+stack_pre_subset <- terra::crop(stack_pre, ext_subset)
 lanid_subset     <- stack_pre_subset[["lanid"]]
 
 stack_subset        <- c(
@@ -123,14 +120,11 @@ df_subset_full <- terra::spatSample(
   as.df  = TRUE
 )
 
-# Exclude irrigated pixels
+# Exclude irrigated pixels and pixels without LANID coverage
 df_subset_full$lanid <- terra::extract(
-  lanid_subset, df_subset_full[, c("x", "y")]
+  lanid_subset, as.matrix(df_subset_full[, c("x", "y")])
 )$lanid
-n_irrigated_subset   <- sum(df_subset_full$lanid == 1, na.rm = TRUE)
-df_subset_full       <- dplyr::filter(
-  df_subset_full, is.na(lanid) | lanid != 1
-)
+df_subset_full       <- drop_irrigated(df_subset_full)
 
 df_subset <- df_subset_full |>
   dplyr::slice_sample(n = min(n_sample, nrow(df_subset_full)))
@@ -152,19 +146,9 @@ plot_cwd_twi <- ggplot(df_subset, aes(x = twi, y = cwd_max)) +
     y       = expression(CWD[max]~"[mm]")) +
   theme_classic()
 
+# Add R²/n/slope label. TWI is dimensionless, so the slope is reported
+# per TWI unit.
+plot_cwd_twi <- annotate_lm(plot_cwd_twi, mod_h2, slope_unit = "mm/TWI unit")
+
 # Save plot
-ggsave(
-  filename = here("fig", "h2_twi_hex_eel_subset.pdf"),
-  plot     = plot_cwd_twi,
-  width    = 16,
-  height   = 12,
-  units    = "cm"
-)
-ggsave(
-  filename = here("fig", "h2_twi_hex_eel_subset.png"),
-  plot     = plot_cwd_twi,
-  width    = 16,
-  height   = 12,
-  units    = "cm",
-  dpi      = 600
-)
+save_fig(plot_cwd_twi, "h2_twi_hex_eel_subset")

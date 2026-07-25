@@ -12,10 +12,14 @@ library(ggplot2)
 library(readr)
 library(here)
 
+# mask_irrigated() applies the project-wide LANID rule (see R/lanid_filter.R).
+# save_fig() writes each figure to fig/ as PDF and PNG (see R/save_fig.R).
+source(here("R", "lanid_filter.R"))
+source(here("R", "save_fig.R"))
+
 set.seed(42)
 
 n_per_class <- 100000   # stratified sample per geology class (before veg split)
-gap_max     <- 6       # max gap-filled months to keep a pixel
 
 
 # Load CWD raster
@@ -72,10 +76,10 @@ lanid_aligned <- stack_pre[["lanid"]]
 
 
 # Build combined class raster
-# Mask geology to the three target vegetation classes and to non-irrigated
-# pixels.
+# Mask geology to the three target vegetation classes and to pixels that
+# LANID marks as non-irrigated.
 combined <- terra::mask(geo_rast, veg_rast) # drop pixels outside the 3 veg classes
-combined <- terra::mask(combined, lanid_aligned, maskvalue = 1)
+combined <- mask_irrigated(combined, lanid_aligned)
 names(combined) <- "geo_class"
 
 
@@ -113,10 +117,11 @@ df <- dplyr::tibble(
                        levels = seq_along(veg_levels),
                        labels = veg_levels)
   ) |>
+  # No filter on gap_filled_months: pixels are kept regardless of gap-fill
+  # count, consistent with 09_h3_geology_edwards_plateau.R.
   dplyr::filter(
     !is.na(cwd_max),
-    !is.na(veg_class),
-    gap_filled_months <= gap_max
+    !is.na(veg_class)
   )
 
 
@@ -145,18 +150,25 @@ p <- ggplot(df, aes(x = veg_class, y = cwd_max, fill = geo_class)) +
     legend.position  = "bottom"
   )
 
-ggsave(
-  here("fig", "h3_edwards_landcover_boxplot.pdf"),
-  plot   = p,
-  width  = 16,
-  height = 10,
-  units  = "cm"
-)
-ggsave(
-  here("fig", "h3_edwards_landcover_boxplot.png"),
-  plot   = p,
-  width  = 16,
-  height = 10,
-  units  = "cm",
-  dpi    = 600
-)
+# Per-(veg_class x geo_class) n label. This boxplot is faceted by
+# veg_class and dodges two boxes (geo_class) within each facet, so a
+# single n per facet would not distinguish Clastic from Carbonate. Not
+# using add_boxplot_n() here: that function only groups by one variable
+# and does not handle position_dodge()/facet_wrap(), so the label
+# wouldn't line up with the correct box.
+# y position: facet_wrap(scales = "free_x") only frees the x scale, so
+# the y range is shared across facets and one global height is valid.
+df_n <- df |>
+  dplyr::count(veg_class, geo_class)
+
+p <- p +
+  geom_text(
+    data        = df_n,
+    mapping     = aes(x = veg_class, y = max(df$cwd_max, na.rm = TRUE) * 1.05,
+                      label = paste0("n = ", n), group = geo_class),
+    position    = position_dodge(width = 0.8),
+    inherit.aes = FALSE,
+    size        = 2.6
+  )
+
+save_fig(p, "h3_edwards_landcover_boxplot", width = 16, height = 10)

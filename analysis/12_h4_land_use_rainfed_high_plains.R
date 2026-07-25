@@ -3,12 +3,25 @@
 # land-use types when irrigation is excluded?
 # The classes are: Cropland rainfed, Grassland rainfed and Shrubland rainfed
 # (NLCD 82 / 71 / 52 restricted to LANID = 0)
+#
+# Here LANID is the classification variable, not just a nuisance filter, but
+# the resulting pixel set is the same one the project-wide rule produces
+# (irrigated and uncovered pixels both dropped), so mask_irrigated() is used
+# as everywhere else. 11_h4_land_use_high_plains.R is the counterpart that
+# keeps irrigated pixels.
 
 # ---- Setup ------------------------------------------------------------------
 library(terra)
 library(dplyr)
 library(ggplot2)
 library(here)
+
+# add_boxplot_n() adds per-group n to the boxplot below.
+# mask_irrigated() applies the project-wide LANID rule (see R/lanid_filter.R).
+# save_fig() writes each figure to fig/ as PDF and PNG (see R/save_fig.R).
+source(here("R", "add_boxplot_n.R"))
+source(here("R", "lanid_filter.R"))
+source(here("R", "save_fig.R"))
 
 set.seed(42)
 
@@ -31,9 +44,7 @@ nlcd_classes <- terra::classify(
   others = NA
 )
 
-is_irrigated <- lanid == 1
-
-class_rainfed <- terra::mask(nlcd_classes, is_irrigated, maskvalue = 1)
+class_rainfed <- mask_irrigated(nlcd_classes, lanid)
 names(class_rainfed) <- "class"
 
 # Stratified sample
@@ -88,19 +99,8 @@ plot_land_use_rainfed <- ggplot(
   theme_classic() +
   theme(legend.position = "none")
 
-ggsave(
-  here("fig", "h4_2_land_use_rainfed.pdf"),
-  plot   = plot_land_use_rainfed,
-  width  = 12,
-  height = 10,
-  units  = "cm"
-)
+# Add per-group n label.
+plot_land_use_rainfed <- plot_land_use_rainfed +
+  add_boxplot_n(df_filtered, "class", "cwd_max")
 
-ggsave(
-  here("fig", "h4_2_land_use_rainfed.png"),
-  plot   = plot_land_use_rainfed,
-  width  = 12,
-  height = 10,
-  units  = "cm",
-  dpi    = 600
-)
+save_fig(plot_land_use_rainfed, "h4_2_land_use_rainfed", width = 12, height = 10)

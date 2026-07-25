@@ -1,6 +1,6 @@
 # 08_geology_eel_river.R
 # Tests whether the Coastal Belt vs. Central Belt CWDmax contrast, validated
-# at the point scale in 08_h3_cwd_dry_elder.R, holds across the wider Eel
+# at the point scale in 07_h3_cwd_dry_elder.R, holds across the wider Eel
 # River region. Extracts CWDmax over all TK/KJf polygons in the focus region
 # and tests H3 (geological substrate) at the formation scale, beyond the
 # two specific catchments studied by Hahm et al. (2019).
@@ -14,16 +14,24 @@ library(ggplot2)
 library(readr)
 library(here)
 
+# add_boxplot_n() adds per-group n to the boxplot below.
+# drop_irrigated() applies the project-wide LANID rule (see R/lanid_filter.R).
+# save_fig() writes each figure to fig/ as PDF and PNG (see R/save_fig.R).
+source(here("R", "add_boxplot_n.R"))
+source(here("R", "lanid_filter.R"))
+source(here("R", "save_fig.R"))
+
 set.seed(42)
 
-# Wong-palette colours shared with 05_h3_cwd_dry_elder.R so that the
-# Coastal Belt / Central Belt distinction is encoded identically across figures.
+# Wong-palette colours for the Coastal Belt / Central Belt distinction.
+# 07_h3_cwd_dry_elder.R currently uses a single grey fill instead, so this
+# encoding is not yet shared across the two H3 figures.
 geo_cols <- c("Coastal Belt (TK)"  = "#009E73",
               "Central Belt (KJf)" = "#D55E00")
 
 
 # Load CWD and LANID rasters
-r      <- terra::rast(here("data", "eel_3ref.tif"))
+r      <- terra::rast(here("data", "eel_9ref.tif"))
 r_cwd  <- r[["cwd_max"]]
 r_gaps <- r[["gap_filled_months"]]
 lanid <- terra::rast(here("data", "stack_eel.tif"))[["lanid"]]
@@ -67,17 +75,18 @@ df_pixels <- dplyr::tibble(
 ) |>
   dplyr::filter(!is.na(cwd_max))
 
-# Exclude irrigated pixels
-n_irrigated <- sum(df_pixels$lanid == 1, na.rm = TRUE)
-df_pixels   <- dplyr::filter(df_pixels, is.na(lanid) | lanid != 1)
+# Exclude irrigated pixels and pixels without LANID coverage
+df_pixels <- drop_irrigated(df_pixels)
 
 
 # Sample
 n_sample <- 100000
 
+# min() guards against a geo_class holding fewer than n_sample pixels after
+# the LANID filter, which slice_sample() would treat as an error.
 df_sample <- df_pixels |>
   dplyr::group_by(geo_class) |>
-  dplyr::slice_sample(n = n_sample) |>
+  dplyr::slice_sample(n = min(n_sample, dplyr::n())) |>
   dplyr::ungroup()
 
 
@@ -89,25 +98,13 @@ p_box <- ggplot(
   geom_boxplot(outlier.size = 0.3, outlier.alpha = 0.2) +
   scale_fill_manual(values = geo_cols) +
   labs(
-    x     = NULL,
-    y     = expression(CWD[max]~"(mm)"),
-    title = "CWD_max Distribution by Geological Formation"
+    x = NULL,
+    y = expression(CWD[max]~"(mm)")
   ) +
   theme_classic() +
   theme(legend.position = "none")
 
-ggsave(
-  here("fig", "h3_eel_river_boxplot.pdf"),
-  plot   = p_box,
-  width  = 12,
-  height = 10,
-  units  = "cm"
-)
-ggsave(
-  here("fig", "h3_eel_river_boxplot.png"),
-  plot   = p_box,
-  width  = 12,
-  height = 10,
-  units  = "cm",
-  dpi    = 600
-)
+# Add per-group n label.
+p_box <- p_box + add_boxplot_n(df_sample, "geo_class", "cwd_max")
+
+save_fig(p_box, "h3_eel_river_boxplot", width = 12, height = 10)

@@ -2,6 +2,11 @@
 # Tests H4 for the High Plains focus region: does CWDmax differ between
 # irrigated and rainfed cropland?
 # The classes are: Cropland irrigated and Cropland rainfed (NLCD 82 x LANID)
+#
+# LANID is the classification variable here, so no mask_irrigated() call:
+# irrigated pixels are a class, not something to exclude. The ifel() chain
+# below still drops pixels without LANID coverage (the condition evaluates to
+# NA there), matching the project-wide rule that uncovered pixels are unusable.
 
 # ---- Setup ------------------------------------------------------------------
 library(terra)
@@ -9,6 +14,11 @@ library(dplyr)
 library(ggplot2)
 library(readr)
 library(here)
+
+# add_boxplot_n() adds per-group n to the boxplot below.
+# save_fig() writes each figure to fig/ as PDF and PNG (see R/save_fig.R).
+source(here("R", "add_boxplot_n.R"))
+source(here("R", "save_fig.R"))
 
 set.seed(42)
 
@@ -24,14 +34,14 @@ lanid     <- stack_pre[["lanid"]]
 # Combine NLCD and LANID into two classes Cropland irrigated and Cropland rainfed
 cropland <- nlcd == 82
 
-crop_lanid_aligned <- terra::ifel(
+class_irrigation <- terra::ifel(
   cropland & lanid == 1, 1,
   terra::ifel(
     cropland & lanid == 0, 0,
     NA
   )
 )
-names(crop_lanid_aligned) <- "class"
+names(class_irrigation) <- "class"
 
 # Stratified sample
 # Irrigated and rainfed cropland end up comparably represented for the H4
@@ -39,7 +49,7 @@ names(crop_lanid_aligned) <- "class"
 n_sample <- 100000
 
 sample_pts <- terra::spatSample(
-  crop_lanid_aligned,
+  class_irrigation,
   size   = n_sample,
   method = "stratified",
   na.rm  = TRUE,
@@ -85,19 +95,8 @@ plot_cropland_irrigation <- ggplot(
   theme_classic() +
   theme(legend.position = "none")
 
-ggsave(
-  here("fig", "h4_cropland_irrigation_boxplot.pdf"),
-  plot   = plot_cropland_irrigation,
-  width  = 12,
-  height = 10,
-  units  = "cm"
-)
+# Add per-group n label.
+plot_cropland_irrigation <- plot_cropland_irrigation +
+  add_boxplot_n(df_filtered, "class", "cwd_max")
 
-ggsave(
-  here("fig", "h4_cropland_irrigation_boxplot.png"),
-  plot   = plot_cropland_irrigation,
-  width  = 12,
-  height = 10,
-  units  = "cm",
-  dpi    = 600
-)
+save_fig(plot_cropland_irrigation, "h4_cropland_irrigation_boxplot", width = 12, height = 10)

@@ -15,6 +15,15 @@ library(ggplot2)
 library(readr)
 library(here)
 
+# add_boxplot_n() adds per-group n to the boxplot below.
+# save_fig() writes each figure to fig/ as PDF and PNG (see R/save_fig.R).
+source(here("R", "add_boxplot_n.R"))
+source(here("R", "save_fig.R"))
+
+# No LANID filter here, unlike the other Eel River scripts: both catchments
+# are forested headwaters with no irrigated land, so the filter would be a
+# no-op.
+
 # Load raster
 r_cwd <- terra::rast(here("data", "eel_9ref.tif"))[["cwd_max"]]
 
@@ -54,21 +63,9 @@ p <- ggplot(df, aes(x = site, y = cwd_max)) +
   theme_classic() +
   theme(legend.position = "none")
 
+# Add per-group n label.
+p <- p + add_boxplot_n(df, "site", "cwd_max")
+
 print(p)
 
-ggsave(
-  here("fig", "h3_elder_dry.pdf"),
-  plot   = p,
-  width  = 12,
-  height = 10,
-  units  = "cm"
-)
-
-ggsave(
-  here("fig", "h3_elder_dry.png"),
-  plot   = p,
-  width  = 12,
-  height = 10,
-  units  = "cm",
-  dpi    = 600
-)
+save_fig(p, "h3_elder_dry", width = 12, height = 10)

@@ -12,6 +12,14 @@ library(broom)
 library(here)
 library(mgcv)
 
+# annotate_lm() adds an R²/n/slope label to scatter/hexbin plots with a
+# trend line (see R/annotate_lm.R for the definition).
+# drop_irrigated() applies the project-wide LANID rule (see R/lanid_filter.R).
+# save_fig() writes each figure to fig/ as PDF and PNG (see R/save_fig.R).
+source(here("R", "annotate_lm.R"))
+source(here("R", "lanid_filter.R"))
+source(here("R", "save_fig.R"))
+
 set.seed(42) # Ensure reproducibility
 
 # Load data
@@ -44,13 +52,14 @@ df_full <- terra::spatSample(
   as.df  = TRUE
 )
 
-# Exclude irrigated pixels
+# Exclude irrigated pixels and pixels without LANID coverage
 df_full$lanid <- terra::extract(lanid, df_full[, c("x", "y")])$lanid
-n_irrigated   <- sum(df_full$lanid == 1, na.rm = TRUE)
-df_full       <- dplyr::filter(df_full, is.na(lanid) | lanid != 1)
+df_full       <- drop_irrigated(df_full)
 
+# min() guards against the LANID filter leaving fewer than n_sample rows,
+# which slice_sample() would treat as an error.
 df <- df_full |>
-  dplyr::slice_sample(n = n_sample)
+  dplyr::slice_sample(n = min(n_sample, nrow(df_full)))
 
 # ---- Test H1: CWDmax vs. Elevation ------------------------------------------
 mod_h1 <- lm(cwd_max ~ elevation, data = df)
@@ -69,22 +78,14 @@ plot_elev_hex <- ggplot(df, aes(x = elevation, y = cwd_max)) +
     y       = expression(CWD[max]~"[mm]"))+
   theme_classic()
 
+# Add R²/n/slope label (task requirement: show R² and n on every trend-line
+# plot; slope included here since H1 makes a claim about effect direction
+# and magnitude, not just significance). Slope unit is mm CWDmax per m
+# elevation, matching the units of mod_h1's predictor.
+plot_elev_hex <- annotate_lm(plot_elev_hex, mod_h1, slope_unit = "mm/m")
+
 # Save plot
-ggsave(
-  filename = here("fig", "h1_elev_hex_appalachia.pdf"),
-  plot     = plot_elev_hex,
-  width    = 16,
-  height   = 12,
-  units    = "cm"
-)
-ggsave(
-  filename = here("fig", "h1_elev_hex_appalachia.png"),
-  plot     = plot_elev_hex,
-  width    = 16,
-  height   = 12,
-  units    = "cm",
-  dpi      = 600
-)
+save_fig(plot_elev_hex, "h1_elev_hex_appalachia")
 
 # ---- Test H2: CWDmax vs. TWI ------------------------------------------------
 mod_h2 <- lm(cwd_max ~ twi, data = df)
@@ -103,19 +104,9 @@ plot_cwd_twi <- ggplot(df, aes(x = twi, y = cwd_max)) +
     y       = expression(CWD[max]~"[mm]")) +
   theme_classic()
 
+# Add R²/n/slope label. TWI is dimensionless, so the slope is reported
+# per TWI unit rather than a physical unit.
+plot_cwd_twi <- annotate_lm(plot_cwd_twi, mod_h2, slope_unit = "mm/TWI unit")
+
 # Save plot
-ggsave(
-  filename = here("fig", "h2_twi_hex_appalachia.pdf"),
-  plot     = plot_cwd_twi,
-  width    = 16,
-  height   = 12,
-  units    = "cm"
-)
-ggsave(
-  filename = here("fig", "h2_twi_hex_appalachia.png"),
-  plot     = plot_cwd_twi,
-  width    = 16,
-  height   = 12,
-  units    = "cm",
-  dpi      = 600
-)
+save_fig(plot_cwd_twi, "h2_twi_hex_appalachia")

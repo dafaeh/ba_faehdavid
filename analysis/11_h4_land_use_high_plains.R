@@ -2,6 +2,10 @@
 # Tests H4 for the High Plains focus region: does CWDmax differ across
 # land-use types?
 # The land-use types are: Cropland, Grassland and Shrubs
+#
+# No LANID filter at all here, unlike every other script: this is the
+# all-land-use case over the full NLCD classes, and
+# 12_h4_land_use_rainfed_high_plains.R is the rainfed counterpart.
 
 # ---- Setup ------------------------------------------------------------------
 library(terra)
@@ -9,6 +13,11 @@ library(dplyr)
 library(ggplot2)
 library(readr)
 library(here)
+
+# add_boxplot_n() adds per-group n to the boxplot below.
+# save_fig() writes each figure to fig/ as PDF and PNG (see R/save_fig.R).
+source(here("R", "add_boxplot_n.R"))
+source(here("R", "save_fig.R"))
 
 set.seed(42)
 
@@ -86,19 +95,7 @@ plot_land_use <- ggplot(
   theme_classic() +
   theme(legend.position = "none")
 
-ggsave(
-  here("fig", "h4_land_use_boxplot.pdf"),
-  plot   = plot_land_use,
-  width  = 12,
-  height = 10,
-  units  = "cm"
-)
+# Add per-group n label.
+plot_land_use <- plot_land_use + add_boxplot_n(df_filtered, "class", "cwd_max")
 
-ggsave(
-  here("fig", "h4_land_use_boxplot.png"),
-  plot   = plot_land_use,
-  width  = 12,
-  height = 10,
-  units  = "cm",
-  dpi    = 600
-)
+save_fig(plot_land_use, "h4_land_use_boxplot", width = 12, height = 10)

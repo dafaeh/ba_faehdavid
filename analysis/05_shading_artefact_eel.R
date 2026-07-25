@@ -13,14 +13,26 @@
 
 # ---- Setup ------------------------------------------------------------------
 library(terra)
-library(sf)
 library(tidyr)
 library(dplyr)
 library(ggplot2)
 library(here)
 
+# annotate_lm() adds R²/n/slope labels to single-trendline scatter plots
+# (Plots 1, 6, 7). add_boxplot_n() adds per-group n to the boxplot (Plot 5).
+# Plot 2 (3 grouped trend lines, one per aspect_class) gets a plain n-only
+# label added inline below, since a single pooled R² there would
+# misrepresent the individual lines -- not worth a dedicated function for
+# a one-line annotate() call.
+# drop_irrigated() applies the project-wide LANID rule (see R/lanid_filter.R).
+# save_fig() writes each figure to fig/ as PDF and PNG (see R/save_fig.R).
+source(here("R", "annotate_lm.R"))
+source(here("R", "add_boxplot_n.R"))
+source(here("R", "lanid_filter.R"))
+source(here("R", "save_fig.R"))
+
 set.seed(42)
-N_SAMPLE <- 1000000
+n_sample <- 1000000
 
 # Colour scale shared across all plots
 aspect_colours <- c(
@@ -35,20 +47,22 @@ cwd       <- terra::rast(here("data", "eel_9ref.tif"))[["cwd_max"]]
 stack_pre <- terra::rast(here("data", "stack_eel.tif"))
 
 # ---- Restrict to eel_shading_subset ------------------------------------------
-aoi_wgs84 <- sf::st_polygon(list(matrix(
-  c(-123.73946585911666, 39.301773660163114,
-    -122.94845023411666, 39.301773660163114,
-    -122.94845023411666, 41.2957488509508,
-    -123.73946585911666, 41.2957488509508,
-    -123.73946585911666, 39.301773660163114),
-  ncol = 2, byrow = TRUE
-))) |>
-  sf::st_sfc(crs = "EPSG:4326")
+# Subset defined directly in EPSG:5070 (the CRS of the rasters), NOT as a
+# WGS84 rectangle. A WGS84 rectangle is a tilted quadrilateral in Albers,
+# and terra::crop() crops to a vector's *bounding box*, never to the
+# polygon itself -- so cropping with the transformed WGS84 rectangle would
+# take the axis-aligned box around the tilted shape, roughly twice the
+# intended area (factor ~1.99 here, because the subset is narrow and tall).
+# These four numbers are identically the red subset_bbox drawn in
+# plot_focus_regions.R, so the analysed area and the mapped area are the
+# same rectangle.
+ext_subset <- terra::ext(
+  -2336730, -2229380,   # xmin, xmax
+  2138000,  2366160    # ymin, ymax
+)
 
-aoi_5070 <- sf::st_transform(aoi_wgs84, "EPSG:5070")
-
-cwd       <- terra::crop(cwd, terra::vect(aoi_5070))
-stack_pre <- terra::crop(stack_pre, terra::vect(aoi_5070))
+cwd       <- terra::crop(cwd, ext_subset)
+stack_pre <- terra::crop(stack_pre, ext_subset)
 
 elevation <- stack_pre[["elevation"]]
 twi       <- stack_pre[["twi"]]
@@ -63,7 +77,7 @@ names(stack) <- c("cwd_max", "elevation", "twi", "northness", "slope")
 
 df_raw <- terra::spatSample(
   stack,
-  size   = N_SAMPLE * 2,
+  size   = n_sample * 2,
   method = "regular",
   na.rm  = FALSE,
   xy     = TRUE,
@@ -71,11 +85,10 @@ df_raw <- terra::spatSample(
 ) |>
   tibble::as_tibble()
 
-# Exclude irrigated pixels using the LANID raster
+# LANID value per sampled pixel, used by the drop_irrigated() call below.
 df_raw$lanid <- terra::extract(lanid, as.matrix(df_raw[, c("x", "y")]))$lanid
 # NLCD land cover, extracted here for the forest filter used in Plot 6.
 df_raw$nlcd  <- terra::extract(nlcd, as.matrix(df_raw[, c("x", "y")]))$nlcd
-n_irrigated  <- sum(df_raw$lanid == 1, na.rm = TRUE)
 
 # Derive classification variables used in the plots below:
 # aspect_class buckets northness into south-/east-west-/north-facing
@@ -83,9 +96,26 @@ n_irrigated  <- sum(df_raw$lanid == 1, na.rm = TRUE)
 # directional. slope_class groups slope into gentle/moderate/steep bins
 # to test whether the artefact scales with slope steepness. elev_band
 # splits elevation into deciles to relate slope to elevation.
+
+# Minimum slope for a meaningful aspect. On near-flat terrain aspect is
+# undefined and the algorithm assigns an arbitrary value, so northness
+# carries no information there.
+slope_min <- 2   # degrees
+
+# Slope class labels are defined once here and reused by every scale that
+# refers to them, so the lower bound stays tied to slope_min. Defining
+# them inline in each scale_*_manual() call let the label drift out of
+# sync with the factor levels when slope_min was introduced.
+slope_labels <- c(
+  gentle   = paste0("gentle (", slope_min, " to 10 deg)"),
+  moderate = "moderate (10 to 25 deg)",
+  steep    = "steep (>25 deg)"
+)
+
 df <- df_raw |>
-  dplyr::filter(is.na(lanid) | lanid != 1) |>
+  drop_irrigated() |>
   tidyr::drop_na(cwd_max, elevation, twi, northness, slope) |>
+  dplyr::filter(slope >= slope_min) |>
   mutate(
     aspect_class = cut(
       northness,
@@ -95,8 +125,8 @@ df <- df_raw |>
     ),
     slope_class = cut(
       slope,
-      breaks         = c(0, 10, 25, 90),
-      labels         = c("gentle (<10 deg)", "moderate (10 to 25 deg)", "steep (>25 deg)"),
+      breaks         = c(slope_min, 10, 25, 90),
+      labels         = unname(slope_labels),
       include.lowest = TRUE
     ),
     elev_band = cut(
@@ -107,7 +137,18 @@ df <- df_raw |>
     )
   )
 
+# Sample size per aspect class, used to annotate Plots 2 and 3 below.
+label_n_aspect_eel <- df |>
+  dplyr::count(aspect_class) |>
+  dplyr::mutate(line = paste0(aspect_class, ": n = ", format(n, big.mark = "'"))) |>
+  dplyr::pull(line) |>
+  paste(collapse = "\n")
+
 # ---- Plot 1: CWDmax vs northness --------------------------------------------
+# Explicit lm fit, matching the formula used by geom_smooth() below, so
+# R²/n/slope can be read off with annotate_lm().
+mod_northness_eel <- lm(cwd_max ~ northness, data = df)
+
 plot_northness_eel <- ggplot(
   data = df,
   aes(x = northness, y = cwd_max)) +
@@ -115,27 +156,25 @@ plot_northness_eel <- ggplot(
   scale_fill_viridis_c(trans = "log10", name = "n (log10)") +
   geom_smooth(method = "lm", formula = y ~ x,
               se = FALSE, colour = "red", linewidth = 0.9) +
+  scale_x_continuous(
+    breaks       = c(-1, -0.5, 0, 0.5, 1),
+    labels       = c("-1\nsouth", "-0.5", "0\neast/west", "0.5", "1\nnorth"),
+    minor_breaks = NULL
+  ) +
   labs(
-    x = "Northness (cos aspect) from south to north",
-    y = expression(CWD[max]~"[mm]")) +
+    x = "Northness [cos(aspect)]",
+    y = expression(CWD[max]~"[mm]")
+  ) +
   theme_classic()
 
+# Add R²/n/slope label. Northness is a dimensionless index (-1 to 1),
+# so the slope is reported per unit northness rather than a physical unit.
+plot_northness_eel <- annotate_lm(
+  plot_northness_eel, mod_northness_eel, slope_unit = "mm/unit northness"
+)
+
 # Save plot
-ggsave(
-  filename = here("fig", "h2_eel_cwd_by_northness_subset.pdf"),
-  plot     = plot_northness_eel,
-  width    = 16,
-  height   = 12,
-  units    = "cm"
-)
-ggsave(
-  filename = here("fig", "h2_eel_cwd_by_northness_subset.png"),
-  plot     = plot_northness_eel,
-  width    = 16,
-  height   = 12,
-  units    = "cm",
-  dpi      = 600
-)
+save_fig(plot_northness_eel, "h2_eel_cwd_by_northness_subset")
 
 # ---- Plot 2: TWI vs CWDmax by aspect ----------------------------------------
 plot_aspect_eel <- ggplot(
@@ -150,28 +189,34 @@ plot_aspect_eel <- ggplot(
   theme_classic() +
   theme(legend.position = "top")
 
-ggsave(
-  filename = here("fig", "h2_eel_cwd_aspect_subset.pdf"),
-  plot     = plot_aspect_eel,
-  width    = 16,
-  height   = 12,
-  units    = "cm"
-)
-ggsave(
-  filename = here("fig", "h2_eel_cwd_aspect_subset.png"),
-  plot     = plot_aspect_eel,
-  width    = 16,
-  height   = 12,
-  units    = "cm",
-  dpi      = 600
-)
+# Per-aspect-group n label, added inline (this plot has 3 separate trend
+# lines, one per aspect_class, so a single pooled R²/slope would
+# misrepresent the individual lines -- per project decision, only n is
+# shown here, broken down per group since the group sizes may differ).
+# Same corner-position/fill styling as annotate_lm(), for consistency.
+plot_aspect_eel <- plot_aspect_eel +
+  annotate(
+    "label",
+    x = Inf, y = Inf, hjust = 1.05, vjust = 1.1,
+    label = label_n_aspect_eel,
+    size = 3.2, label.size = 0.3,
+    label.padding = unit(0.4, "lines"),
+    fill = scales::alpha("white", 0.9)
+  )
+
+save_fig(plot_aspect_eel, "h2_eel_cwd_aspect_subset")
 
 # ---- Plot 3: slope x aspect -------------------------------------------------
-# Fixed y-axis limits for cross-region comparability with Plot 3 in
-# 06_shading_artefact_appalachia.R. Eel River has the wider mean_cwd
-# range, so it sets the bounds for both plots. Values from
-# range(mean_cwd) below.
-SHARED_Y_LIMITS_SLOPE_ASPECT <- c(137.7566, 810.8651)
+# Fixed y-axis limits, shared with Plot 3 in
+# 06_shading_artefact_appalachia.R for cross-region comparability. The
+# range spans BOTH regions: lower bound from Appalachia (137.7566), upper
+# bound from Eel River (826.7845), each read off range(mean_cwd) with the
+# same crop/filter/classification the plot uses. The two regions barely
+# overlap (Appalachia 137.8-171.4, Eel 533.9-826.8), so on a shared axis
+# each region's lines occupy only part of the range -- an accepted
+# trade-off for comparability. Re-read both ranges whenever the subset,
+# slope_min, or the class breaks change.
+shared_y_limits_slope_aspect <- c(137.7566, 826.7845)
 
 plot_slope_aspect <- df |>
   group_by(aspect_class, slope_class) |>
@@ -182,95 +227,71 @@ plot_slope_aspect <- df |>
   geom_point(size = 3) +
   scale_colour_manual(values = aspect_colours, name = "Aspect") +
   scale_x_discrete(limits = rev) +
-  coord_cartesian(ylim = SHARED_Y_LIMITS_SLOPE_ASPECT) +
+  coord_cartesian(ylim = shared_y_limits_slope_aspect) +
   labs(
     x       = "Slope class",
     y       = expression(CWD[max]~"[mm]")) +
   theme_classic() +
   theme(legend.position = "top")
 
-ggsave(
-  filename = here("fig", "h2_eel_slope_aspect_subset.pdf"),
-  plot     = plot_slope_aspect,
-  width    = 16,
-  height   = 12,
-  units    = "cm"
-)
-ggsave(
-  filename = here("fig", "h2_eel_slope_aspect_subset.png"),
-  plot     = plot_slope_aspect,
-  width    = 16,
-  height   = 12,
-  units    = "cm",
-  dpi      = 600
-)
+# Per-aspect-group n label (same counts as Plot 2, since both are based
+# on the full df -- each line here aggregates the same pixels into
+# per-slope-class means).
+plot_slope_aspect <- plot_slope_aspect +
+  annotate(
+    "label",
+    x = Inf, y = Inf, hjust = 1.05, vjust = 1.1,
+    label = label_n_aspect_eel,
+    size = 3.2, label.size = 0.3,
+    label.padding = unit(0.4, "lines"),
+    fill = scales::alpha("white", 0.9)
+  )
 
-# ---- Plot 4: mean slope per elevation band ----------------------------------
-# To test whether CWDmax is systematically overestimated at higher elevations, 
-# which would confound H1.
+save_fig(plot_slope_aspect, "h2_eel_slope_aspect_subset")
 
-plot_slope_elev <- df |>
-  group_by(elev_band) |>
-  summarise(mean_slope = mean(slope, na.rm = TRUE), .groups = "drop") |>
-  ggplot(
-    aes(x = elev_band, y = mean_slope, group = 1)) +
-  geom_line(linewidth = 1, colour = "grey30") +
-  geom_point(size = 3, colour = "grey30") +
-  labs(
-    x = "Elevation band (low to high)",
-    y = "Mean slope (degrees)") +
-  theme_classic() +
-  theme(axis.text.x = element_text(angle = 35, hjust = 1, size = 8))
-
-ggsave(
-  filename = here("fig", "h2_eel_slope_by_elev_subset.pdf"),
-  plot     = plot_slope_elev,
-  width    = 16,
-  height   = 12,
-  units    = "cm"
-)
-ggsave(
-  filename = here("fig", "h2_eel_slope_by_elev_subset.png"),
-  plot     = plot_slope_elev,
-  width    = 16,
-  height   = 12,
-  units    = "cm",
-  dpi      = 600
-)
-
-# ---- Plot 5: CWDmax by slope class ------------------------------------------
-plot_cwd_slope_class <- ggplot(
-  data = df,
-  aes(x = slope_class, y = cwd_max, fill = slope_class)) +
-  geom_boxplot(outlier.alpha = 0.05, outlier.size = 0.5) +
-  scale_fill_manual(
-    values = c(
-      "gentle (<10 deg)"        = "#fee08b",
-      "moderate (10 to 25 deg)" = "#fd8d3c",
-      "steep (>25 deg)"         = "#d7301f"
-    )
-  ) +
-  labs(
-    x = "Slope class",
-    y = expression(CWD[max]~"[mm]")) +
-  theme_classic() +
-  theme(legend.position = "none")
-
-ggsave(
-  filename = here("fig", "h2_eel_cwd_by_slope_subset.pdf"),
-  plot     = plot_cwd_slope_class,
-  width    = 16,
-  height   = 12,
-  units    = "cm"
-)
-ggsave(
-  filename = here("fig", "h2_eel_cwd_by_slope_subset.png"),
-  plot     = plot_cwd_slope_class,
-  width    = 16,
-  height   = 12,
-  units    = "cm",
-  dpi      = 600
-)
+# # ---- Plot 4: mean slope per elevation band ----------------------------------
+# # To test whether CWDmax is systematically overestimated at higher elevations, 
+# # which would confound H1.
+# 
+# plot_slope_elev <- df |>
+#   group_by(elev_band) |>
+#   summarise(mean_slope = mean(slope, na.rm = TRUE), .groups = "drop") |>
+#   ggplot(
+#     aes(x = elev_band, y = mean_slope, group = 1)) +
+#   geom_line(linewidth = 1, colour = "grey30") +
+#   geom_point(size = 3, colour = "grey30") +
+#   labs(
+#     x = "Elevation band (low to high)",
+#     y = "Mean slope (degrees)") +
+#   theme_classic() +
+#   theme(axis.text.x = element_text(angle = 35, hjust = 1, size = 8))
+# 
+# save_fig(plot_slope_elev, "h2_eel_slope_by_elev_subset")
+# 
+# # ---- Plot 5: CWDmax by slope class ------------------------------------------
+# plot_cwd_slope_class <- ggplot(
+#   data = df,
+#   aes(x = slope_class, y = cwd_max, fill = slope_class)) +
+#   geom_boxplot(outlier.alpha = 0.05, outlier.size = 0.5) +
+#   # Names taken from slope_labels so the fill keys always match the factor
+#   # levels created above, whatever slope_min is set to.
+#   scale_fill_manual(
+#     values = setNames(
+#       c("#fee08b", "#fd8d3c", "#d7301f"),
+#       unname(slope_labels)
+#     )
+#   ) +
+#   labs(
+#     x = "Slope class",
+#     y = expression(CWD[max]~"[mm]")) +
+#   theme_classic() +
+#   theme(legend.position = "none")
+# 
+# # Add per-group n label.
+# plot_cwd_slope_class <- plot_cwd_slope_class +
+#   add_boxplot_n(df, "slope_class", "cwd_max")
+# 
+# save_fig(plot_cwd_slope_class, "h2_eel_cwd_by_slope_subset")
 
 # ---- Plot 6: TWI vs CWDmax, south-facing forest only ------------------------
 # Only high quality pixels are used for this plot. Restricting to south-facing
@@ -282,6 +303,10 @@ df_south_forest <- df |>
   dplyr::filter(aspect_class == "south-facing")
 
 # Plot
+# Explicit lm fit, matching geom_smooth() below, so annotate_lm() can
+# read off R²/n/slope.
+mod_twi_forest_south_eel <- lm(cwd_max ~ twi, data = df_south_forest)
+
 plot_twi_forest_south <- ggplot(
   data = df_south_forest,
   aes(x = twi, y = cwd_max)) +
@@ -294,22 +319,14 @@ plot_twi_forest_south <- ggplot(
     y = expression(CWD[max]~"[mm]")) +
   theme_classic()
 
+# Add R²/n/slope label. TWI is dimensionless, so the slope is reported
+# per TWI unit rather than a physical unit.
+plot_twi_forest_south <- annotate_lm(
+  plot_twi_forest_south, mod_twi_forest_south_eel, slope_unit = "mm/TWI unit"
+)
+
 # Save plot
-ggsave(
-  filename = here("fig", "h2_eel_twi_forest_south_subset.pdf"),
-  plot     = plot_twi_forest_south,
-  width    = 16,
-  height   = 12,
-  units    = "cm"
-)
-ggsave(
-  filename = here("fig", "h2_eel_twi_forest_south_subset.png"),
-  plot     = plot_twi_forest_south,
-  width    = 16,
-  height   = 12,
-  units    = "cm",
-  dpi      = 600
-)
+save_fig(plot_twi_forest_south, "h2_eel_twi_forest_south_subset")
 
 # ---- Plot 7: TWI vs CWDmax, forest only, all aspects pooled -----------------
 # Test whether the shading bias is also present, when all aspects are pooled.
@@ -320,6 +337,10 @@ df_forest_pooled <- df |>
   dplyr::filter(nlcd %in% c(41, 42, 43))   # deciduous/evergreen/mixed forest
 
 # Plot
+# Explicit lm fit, matching geom_smooth() below, so annotate_lm() can
+# read off R²/n/slope.
+mod_twi_forest_pooled_eel <- lm(cwd_max ~ twi, data = df_forest_pooled)
+
 plot_twi_forest_pooled <- ggplot(
   data = df_forest_pooled,
   aes(x = twi, y = cwd_max)) +
@@ -332,19 +353,11 @@ plot_twi_forest_pooled <- ggplot(
     y = expression(CWD[max]~"[mm]")) +
   theme_classic()
 
+# Add R²/n/slope label. TWI is dimensionless, so the slope is reported
+# per TWI unit rather than a physical unit.
+plot_twi_forest_pooled <- annotate_lm(
+  plot_twi_forest_pooled, mod_twi_forest_pooled_eel, slope_unit = "mm/TWI unit"
+)
+
 # Save plot
-ggsave(
-  filename = here("fig", "h2_eel_twi_forest_pooled_subset.pdf"),
-  plot     = plot_twi_forest_pooled,
-  width    = 16,
-  height   = 12,
-  units    = "cm"
-)
-ggsave(
-  filename = here("fig", "h2_eel_twi_forest_pooled_subset.png"),
-  plot     = plot_twi_forest_pooled,
-  width    = 16,
-  height   = 12,
-  units    = "cm",
-  dpi      = 600
-)
+save_fig(plot_twi_forest_pooled, "h2_eel_twi_forest_pooled_subset")

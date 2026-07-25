@@ -12,6 +12,13 @@ library(ggplot2)
 library(readr)
 library(here)
 
+# add_boxplot_n() adds per-group n to the boxplot below.
+# mask_irrigated() applies the project-wide LANID rule (see R/lanid_filter.R).
+# save_fig() writes each figure to fig/ as PDF and PNG (see R/save_fig.R).
+source(here("R", "add_boxplot_n.R"))
+source(here("R", "lanid_filter.R"))
+source(here("R", "save_fig.R"))
+
 set.seed(42)
 
 # Load CWD and LANID rasters
@@ -47,8 +54,10 @@ sgmc_vect$class_int <- as.integer(sgmc$geo_class)
 geo_rast <- terra::rasterize(sgmc_vect, r_cwd, field = "class_int")
 names(geo_rast) <- "geo_class"
 
-# Exclude irrigated pixels
-geo_rast <- terra::mask(geo_rast, lanid, maskvalue = 1)
+# Exclude irrigated pixels and pixels without LANID coverage. Applied to the
+# class raster before sampling, so the strata already exclude them and no
+# further LANID handling is needed downstream.
+geo_rast <- mask_irrigated(geo_rast, lanid)
 
 # Stratified sample 
 # Per-class n_sample, not area-proportional: ensures Clastic and Carbonate
@@ -64,14 +73,12 @@ sample_pts <- terra::spatSample(
   as.df  = TRUE
 )
 
-cwd_at_pts   <- terra::extract(r,     sample_pts[, c("x", "y")])
-lanid_at_pts <- terra::extract(lanid, sample_pts[, c("x", "y")])
+cwd_at_pts <- terra::extract(r, sample_pts[, c("x", "y")])
 
 df_sample <- dplyr::tibble(
   geo_class         = sample_pts$geo_class,
   cwd_max           = cwd_at_pts$cwd_max,
-  gap_filled_months = cwd_at_pts$gap_filled_months,
-  lanid             = lanid_at_pts$lanid
+  gap_filled_months = cwd_at_pts$gap_filled_months
 ) |>
   dplyr::mutate(
     geo_class = factor(
@@ -96,18 +103,7 @@ p_box <- ggplot(
   theme_classic() +
   theme(legend.position = "none")
 
-ggsave(
-  here("fig", "h3_edwards_boxplot.pdf"),
-  plot   = p_box,
-  width  = 12,
-  height = 10,
-  units  = "cm"
-)
-ggsave(
-  here("fig", "h3_edwards_boxplot.png"),
-  plot   = p_box,
-  width  = 12,
-  height = 10,
-  units  = "cm",
-  dpi    = 600
-)
+# Add per-group n label.
+p_box <- p_box + add_boxplot_n(df_sample, "geo_class", "cwd_max")
+
+save_fig(p_box, "h3_edwards_boxplot", width = 12, height = 10)
