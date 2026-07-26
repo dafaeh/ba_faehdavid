@@ -3,12 +3,7 @@
 # land-use types when irrigation is excluded?
 # The classes are: Cropland rainfed, Grassland rainfed and Shrubland rainfed
 # (NLCD 82 / 71 / 52 restricted to LANID = 0)
-#
-# Here LANID is the classification variable, not just a nuisance filter, but
-# the resulting pixel set is the same one the project-wide rule produces
-# (irrigated and uncovered pixels both dropped), so mask_irrigated() is used
-# as everywhere else. 11_h4_land_use_high_plains.R is the counterpart that
-# keeps irrigated pixels.
+
 
 # ---- Setup ------------------------------------------------------------------
 library(terra)
@@ -16,9 +11,6 @@ library(dplyr)
 library(ggplot2)
 library(here)
 
-# add_boxplot_n() adds per-group n to the boxplot below.
-# mask_irrigated() applies the project-wide LANID rule (see R/lanid_filter.R).
-# save_fig() writes each figure to fig/ as PDF and PNG (see R/save_fig.R).
 source(here("R", "add_boxplot_n.R"))
 source(here("R", "lanid_filter.R"))
 source(here("R", "save_fig.R"))
@@ -26,7 +18,6 @@ source(here("R", "save_fig.R"))
 set.seed(42)
 
 # Load CWD, NLCD and LANID
-
 r <- terra::rast(here("data", "high_plains_9ref.tif"))
 
 stack_pre <- terra::rast(here("data", "stack_high_plains.tif"))
@@ -34,7 +25,7 @@ nlcd      <- stack_pre[["nlcd"]]
 lanid     <- stack_pre[["lanid"]]
 
 # Reduce NLCD to three classes and keep only rainfed pixels.
-# Pixels without LANID coverage are dropped too, their rainfed status is unknown.
+# Pixels without LANID coverage are dropped too as their rainfed status is unknown.
 nlcd_classes <- terra::classify(
   nlcd,
   rcl    = matrix(c(82, 1,
@@ -48,8 +39,8 @@ class_rainfed <- mask_irrigated(nlcd_classes, lanid)
 names(class_rainfed) <- "class"
 
 # Stratified sample
-# Cropland, Grassland, and Shrub/Scrub end up comparably represented for the H4
-# group comparison, despite different areal shares.
+# Cropland, Grassland, and Shrub/Scrub end up comparably represented for the
+# group comparison
 n_sample <- 100000
 
 sample_pts <- terra::spatSample(
@@ -79,14 +70,6 @@ df_sample <- dplyr::tibble(
   ) |>
   dplyr::filter(!is.na(cwd_max))
 
-# ---- Quality filter ---------------------------------------------------------
-
-df_filtered <- df_sample
-
-# Eventually drop pixels with too many gap filled months, for example:
-
-# df_filtered <- df_sample |>
-#   dplyr::filter(gap_filled_months <= 6)
 
 # Boxplot
 plot_land_use_rainfed <- ggplot(

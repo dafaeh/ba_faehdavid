@@ -1,6 +1,6 @@
 # 06_shading_artefact_appalachia.R
 # This script works in the same way as the 05_shading_artefact_eel.R one but 
-# for the appalachians focus region. It tests for the shading bias. 
+# for the appalachians focus region. 
 
 # A shlightly different approach is used when filtering for high-quality pixels 
 # only. Instead of using a Geology polygon to filter, the NLCD raster is used
@@ -13,14 +13,6 @@ library(dplyr)
 library(ggplot2)
 library(here)
 
-# annotate_lm() adds R²/n/slope labels to single-trendline scatter plots
-# (Plots 1, 6, 7). add_boxplot_n() adds per-group n to the boxplot (Plot 5).
-# Plot 2 (3 grouped trend lines, one per aspect_class) gets a plain n-only
-# label added inline below, since a single pooled R² there would
-# misrepresent the individual lines -- not worth a dedicated function for
-# a one-line annotate() call.
-# drop_irrigated() applies the project-wide LANID rule (see R/lanid_filter.R).
-# save_fig() writes each figure to fig/ as PDF and PNG (see R/save_fig.R).
 source(here("R", "annotate_lm.R"))
 source(here("R", "add_boxplot_n.R"))
 source(here("R", "lanid_filter.R"))
@@ -29,7 +21,6 @@ source(here("R", "save_fig.R"))
 set.seed(42)
 n_sample <- 1000000
 
-# Colour scale shared across all plots
 aspect_colours <- c(
   "south-facing" = "#d73027",
   "east/west"    = "#fee08b",
@@ -44,7 +35,7 @@ elevation <- stack_pre[["elevation"]]
 twi       <- stack_pre[["twi"]]
 northness <- stack_pre[["northness"]]
 slope     <- stack_pre[["slope"]]
-nlcd      <- stack_pre[["nlcd"]]    # NLCD is needed later on to filter for high-quality pixels
+nlcd      <- stack_pre[["nlcd"]]    
 lanid     <- stack_pre[["lanid"]]
 
 # ---- Sample -----------------------------------------------------------------
@@ -66,22 +57,16 @@ df_raw$lanid <- terra::extract(lanid, as.matrix(df_raw[, c("x", "y")]))$lanid
 
 # Derive classification variables used in the plots below:
 # aspect_class buckets northness into south-/east-west-/north-facing
-# terciles (breaks at ±0.33) to test whether the shading artefact is
-# directional. 
-
-# slope_class groups slope into gentle/moderate/steep bins to test whether the 
-# artefact scales with slope steepness. 
+# terciles (breaks at ±0.33). slope_class groups slope into gentle/moderate/steep bins
 # elev_band splits elevation into deciles to relate slope to elevation.
 
 # Minimum slope for a meaningful aspect. On near-flat terrain aspect is
-# undefined and the algorithm assigns an arbitrary value, so northness
+# undefined and the algorithm assigns a random value, so northness
 # carries no information there.
 slope_min <- 2   # degrees
 
 # Slope class labels are defined once here and reused by every scale that
-# refers to them, so the lower bound stays tied to slope_min. Defining
-# them inline in each scale_*_manual() call let the label drift out of
-# sync with the factor levels when slope_min was introduced.
+# refers to them
 slope_labels <- c(
   gentle   = paste0("gentle (", slope_min, " to 10 deg)"),
   moderate = "moderate (10 to 25 deg)",
@@ -121,7 +106,7 @@ label_n_aspect_appalachia <- df |>
   paste(collapse = "\n")
 
 # ---- Plot 1: CWDmax vs northness --------------------------------------------
-# Explicit lm fit, matching the formula used by geom_smooth() below, so
+# lm fit, matching the formula used by geom_smooth() below, so
 # R²/n/slope can be read off with annotate_lm().
 mod_northness_appalachia <- lm(cwd_max ~ northness, data = df)
 
@@ -143,8 +128,7 @@ plot_northness_appalachia <- ggplot(
   ) +
   theme_classic()
 
-# Add R²/n/slope label. Northness is a dimensionless index (-1 to 1),
-# so the slope is reported per unit northness rather than a physical unit.
+# Add R²/n/slope.
 plot_northness_appalachia <- annotate_lm(
   plot_northness_appalachia, mod_northness_appalachia,
   slope_unit = "mm/unit northness"
@@ -165,11 +149,7 @@ plot_aspect_appalachia <- ggplot(
   theme_classic() +
   theme(legend.position = "top")
 
-# Per-aspect-group n label, added inline (this plot has 3 separate trend
-# lines, one per aspect_class, so a single pooled R²/slope would
-# misrepresent the individual lines -- per project decision, only n is
-# shown here, broken down per group since the group sizes may differ).
-# Same corner-position/fill styling as annotate_lm(), for consistency.
+# Add per-aspect-group n label 
 plot_aspect_appalachia <- plot_aspect_appalachia +
   annotate(
     "label",
@@ -183,10 +163,9 @@ plot_aspect_appalachia <- plot_aspect_appalachia +
 save_fig(plot_aspect_appalachia, "h2_appalachia_cwd_aspect")
 
 # ---- Plot 3: slope x aspect ------------------------------------------------
-# Fixed y-axis limits for cross-region comparability with Plot 3 in
-# 05_shading_artefact_eel.R. Bounds taken from Eel River's
-# range(mean_cwd), which is wider than Appalachia's own range.
-shared_y_limits_slope_aspect <- c(137.7566, 810.8651)
+# Fixed y-axis limits, shared with Plot 3 in
+# 06_shading_artefact_appalachia.R for cross-region comparability. 
+shared_y_limits_slope_aspect <- c(137.7566, 826.7845)
 
 plot_slope_aspect <- df |>
   group_by(aspect_class, slope_class) |>
@@ -204,9 +183,7 @@ plot_slope_aspect <- df |>
   theme_classic() +
   theme(legend.position = "top")
 
-# Per-aspect-group n label (same counts as Plot 2, since both are based
-# on the full df -- each line here aggregates the same pixels into
-# per-slope-class means).
+# Per-aspect-group n label 
 plot_slope_aspect <- plot_slope_aspect +
   annotate(
     "label",
@@ -263,28 +240,11 @@ save_fig(plot_slope_aspect, "h2_appalachia_slope_aspect")
 # save_fig(plot_cwd_slope_class, "h2_appalachia_cwd_by_slope")
 
 # ---- Plot 6: TWI vs CWDmax, south-facing forest only ------------------------
-# Plot 2 showed south-facing pixels are the aspect class least affected by
-# the shading artefact. This isolates that best-case subset further, to one
-# land-cover class (deciduous/evergreen/mixed forest, NLCD 2019 codes
-# 41/42/43), to check whether a TWI-CWDmax signal emerges once aspect and
-# land cover are both held constant. Complete TWI range (no additional
-# filtering).
-
-# The Eel River counterpart (05_shading_artefact_eel.R, Plot 6) applies the
-# same forest + south-facing filter, but reuses the shared df because its
-# subset is small. Here the region is much larger: a full as.data.frame()
-# over the Appalachia stack exhausts memory (std::bad_alloc), so this block
-# re-samples independently (own stack incl. nlcd, own draw) instead. A regular
-# sample avoids the memory blow-up and is dense enough for a hexbin. Sampling
-# independently also leaves the shared df feeding Plots 1-5 untouched.
-# slope is carried along solely to apply the same slope_min filter as above:
-# without it the south-facing class would include near-flat pixels whose
-# aspect is arbitrary, and the subset would no longer match the one behind
-# Plots 1-5.
-# Draw size is n_sample * 2, matching the shared df above and the Eel River
-# counterpart, so the two regions differ only in how the sample is drawn,
-# not in how large it is.
-
+# Isolate high-quality pixels: south-facing (least affected by the shading) 
+# and forest only, to check whether a TWI-CWDmax signal emerges once aspect and land cover are held
+# constant. Re-samples independently rather than reusing the shared df: over
+# the full Appalachia stack as.data.frame() runs out of memory. slope is only
+# carried along to reapply the slope_min filter.
 stack_forest <- c(cwd, twi, northness, slope, nlcd, lanid)
 names(stack_forest) <- c("cwd_max", "twi", "northness", "slope", "nlcd", "lanid")
 
@@ -315,8 +275,6 @@ df_forest <- df_forest_raw |>
   dplyr::filter(aspect_class == "south-facing")
 
 # Plot
-# Explicit lm fit, matching geom_smooth() below, so annotate_lm() can
-# read off R²/n/slope.
 mod_twi_forest_south_appalachia <- lm(cwd_max ~ twi, data = df_forest)
 
 plot_twi_forest_south <- ggplot(
@@ -331,8 +289,7 @@ plot_twi_forest_south <- ggplot(
     y = expression(CWD[max]~"[mm]")) +
   theme_classic()
 
-# Add R²/n/slope label. TWI is dimensionless, so the slope is reported
-# per TWI unit rather than a physical unit.
+# Add R²/n/slope label
 plot_twi_forest_south <- annotate_lm(
   plot_twi_forest_south, mod_twi_forest_south_appalachia,
   slope_unit = "mm/TWI unit"
@@ -366,8 +323,6 @@ df_forest_pooled <- df_forest_pooled_raw |>
   dplyr::filter(slope >= slope_min)
 
 # Plot
-# Explicit lm fit, matching geom_smooth() below, so annotate_lm() can
-# read off R²/n/slope.
 mod_twi_forest_pooled_appalachia <- lm(cwd_max ~ twi, data = df_forest_pooled)
 
 plot_twi_forest_pooled <- ggplot(
@@ -382,8 +337,6 @@ plot_twi_forest_pooled <- ggplot(
     y = expression(CWD[max]~"[mm]")) +
   theme_classic()
 
-# Add R²/n/slope label. TWI is dimensionless, so the slope is reported
-# per TWI unit rather than a physical unit.
 plot_twi_forest_pooled <- annotate_lm(
   plot_twi_forest_pooled, mod_twi_forest_pooled_appalachia,
   slope_unit = "mm/TWI unit"

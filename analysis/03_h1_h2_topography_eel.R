@@ -1,10 +1,7 @@
 # 03_h1_h2_topography_eel.R
-# This Script tests H1 (CWDmax decreases with elevation) and H2 (valley bottoms show
-# higher CWDmax than ridges) for the Eel River focus region.
-#
+
 # H1 (elevation) uses the full Eel River focus region.
-# H2 (TWI) is restricted to eel_shading_subset, used to test sensitivity to
-# shading effects on DisALEXI ET (see Risks and Contingency in the proposal).
+# H2 (TWI) is restricted to eel_shading_subset
 
 # ---- Setup ------------------------------------------------------------------
 library(terra)
@@ -15,14 +12,14 @@ library(here)
 library(mgcv)
 
 # annotate_lm() adds an R²/n/slope label to scatter/hexbin plots with a
-# trend line (see R/annotate_lm.R for the definition).
-# drop_irrigated() applies the project-wide LANID rule (see R/lanid_filter.R).
-# save_fig() writes each figure to fig/ as PDF and PNG (see R/save_fig.R).
+# trend line 
+# drop_irrigated() drops irrigated and NA pixels of the LANID dataset out of a dataframe
+# save_fig() writes each figure to fig/ as PDF and PNG
 source(here("R", "annotate_lm.R"))
 source(here("R", "lanid_filter.R"))
 source(here("R", "save_fig.R"))
 
-set.seed(42) # Ensure reproducibility
+set.seed(42) # For reproducibility
 
 # Load data
 path_cwd    <- here("data", "eel_9ref.tif")
@@ -79,21 +76,14 @@ plot_elev_hex <- ggplot(df, aes(x = elevation, y = cwd_max)) +
     y       = expression(CWD[max]~"[mm]"))+
   theme_classic()
 
-# Add R²/n/slope label. Slope unit is mm CWDmax per m elevation.
+# Add R²/n/slope label. 
 plot_elev_hex <- annotate_lm(plot_elev_hex, mod_h1, slope_unit = "mm/m")
 
 # Save plot
 save_fig(plot_elev_hex, "h1_elev_hex_eel")
 
-# ---- Restrict to eel_shading_subset (used for H2) ----------------------------
-# Subset defined directly in EPSG:5070 (the CRS of the rasters), NOT as a
-# WGS84 rectangle. A WGS84 rectangle is a tilted quadrilateral in Albers,
-# and terra::crop() crops to a vector's *bounding box*, never to the
-# polygon itself -- so cropping with the transformed WGS84 rectangle would
-# take the axis-aligned box around the tilted shape, roughly twice the
-# intended area (the subset is narrow and tall, which maximises the effect).
-# These four numbers must stay identical to ext_subset in
-# 05_shading_artefact_eel.R and to subset_bbox in plot_focus_regions.R.
+# ---- Restrict to eel_subset (used for H2) ----------------------------
+# Subset defined directly in EPSG:5070 
 ext_subset <- terra::ext(
   -2336730, -2229380,   # xmin, xmax
   2138000,  2366160    # ymin, ymax

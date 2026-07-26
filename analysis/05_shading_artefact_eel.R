@@ -2,14 +2,7 @@
 # Provides evidence that a topographic shading artefact in DisALEXI prevents
 # robust testing of H1 and H2 in the Eel River focus region.
 #
-# Restricted to eel_shading_subset, used to test sensitivity to shading
-# effects on DisALEXI ET (see Risks and Contingency in the proposal).
-
-# DisALEXI derives ET from land surface temperature (LST): low LST is
-# interpreted as high ET via evaporative cooling. Topographic shading reduces
-# LST independently of ET, causing ET and therefore CWDmax to be
-# overestimated on shaded slopes. The artefact is expected to be strongest
-# on steep north-facing slopes, where shading is strongest.
+# Restricted to eel_shading_subset
 
 # ---- Setup ------------------------------------------------------------------
 library(terra)
@@ -18,14 +11,6 @@ library(dplyr)
 library(ggplot2)
 library(here)
 
-# annotate_lm() adds R²/n/slope labels to single-trendline scatter plots
-# (Plots 1, 6, 7). add_boxplot_n() adds per-group n to the boxplot (Plot 5).
-# Plot 2 (3 grouped trend lines, one per aspect_class) gets a plain n-only
-# label added inline below, since a single pooled R² there would
-# misrepresent the individual lines -- not worth a dedicated function for
-# a one-line annotate() call.
-# drop_irrigated() applies the project-wide LANID rule (see R/lanid_filter.R).
-# save_fig() writes each figure to fig/ as PDF and PNG (see R/save_fig.R).
 source(here("R", "annotate_lm.R"))
 source(here("R", "add_boxplot_n.R"))
 source(here("R", "lanid_filter.R"))
@@ -34,7 +19,7 @@ source(here("R", "save_fig.R"))
 set.seed(42)
 n_sample <- 1000000
 
-# Colour scale shared across all plots
+# Colour scale to keep group colours constant across plots
 aspect_colours <- c(
   "south-facing" = "#d73027",
   "east/west"    = "#fee08b",
@@ -46,19 +31,10 @@ cwd       <- terra::rast(here("data", "eel_9ref.tif"))[["cwd_max"]]
 
 stack_pre <- terra::rast(here("data", "stack_eel.tif"))
 
-# ---- Restrict to eel_shading_subset ------------------------------------------
-# Subset defined directly in EPSG:5070 (the CRS of the rasters), NOT as a
-# WGS84 rectangle. A WGS84 rectangle is a tilted quadrilateral in Albers,
-# and terra::crop() crops to a vector's *bounding box*, never to the
-# polygon itself -- so cropping with the transformed WGS84 rectangle would
-# take the axis-aligned box around the tilted shape, roughly twice the
-# intended area (factor ~1.99 here, because the subset is narrow and tall).
-# These four numbers are identically the red subset_bbox drawn in
-# plot_focus_regions.R, so the analysed area and the mapped area are the
-# same rectangle.
+# Restrict to eel_subset
 ext_subset <- terra::ext(
-  -2336730, -2229380,   # xmin, xmax
-  2138000,  2366160    # ymin, ymax
+  -2336730, -2229380, 
+  2138000,  2366160 
 )
 
 cwd       <- terra::crop(cwd, ext_subset)
@@ -85,27 +61,24 @@ df_raw <- terra::spatSample(
 ) |>
   tibble::as_tibble()
 
-# LANID value per sampled pixel, used by the drop_irrigated() call below.
+# LANID value per sampled pixel, used by the drop_irrigated() function below.
 df_raw$lanid <- terra::extract(lanid, as.matrix(df_raw[, c("x", "y")]))$lanid
-# NLCD land cover, extracted here for the forest filter used in Plot 6.
+
+# NLCD land cover. extracted here for the forest filter used in Plot 6.
 df_raw$nlcd  <- terra::extract(nlcd, as.matrix(df_raw[, c("x", "y")]))$nlcd
 
 # Derive classification variables used in the plots below:
 # aspect_class buckets northness into south-/east-west-/north-facing
-# terciles (breaks at ±0.33) to test whether the shading artefact is
-# directional. slope_class groups slope into gentle/moderate/steep bins
-# to test whether the artefact scales with slope steepness. elev_band
-# splits elevation into deciles to relate slope to elevation.
+# terciles (breaks at ±0.33). slope_class groups slope into gentle/moderate/steep bins
+# elev_band splits elevation into deciles to relate slope to elevation.
 
 # Minimum slope for a meaningful aspect. On near-flat terrain aspect is
-# undefined and the algorithm assigns an arbitrary value, so northness
+# undefined and the algorithm assigns a random value, so northness
 # carries no information there.
 slope_min <- 2   # degrees
 
 # Slope class labels are defined once here and reused by every scale that
-# refers to them, so the lower bound stays tied to slope_min. Defining
-# them inline in each scale_*_manual() call let the label drift out of
-# sync with the factor levels when slope_min was introduced.
+# refers to them
 slope_labels <- c(
   gentle   = paste0("gentle (", slope_min, " to 10 deg)"),
   moderate = "moderate (10 to 25 deg)",
@@ -145,7 +118,7 @@ label_n_aspect_eel <- df |>
   paste(collapse = "\n")
 
 # ---- Plot 1: CWDmax vs northness --------------------------------------------
-# Explicit lm fit, matching the formula used by geom_smooth() below, so
+# lm fit, matching the formula used by geom_smooth() below, so
 # R²/n/slope can be read off with annotate_lm().
 mod_northness_eel <- lm(cwd_max ~ northness, data = df)
 
@@ -167,8 +140,8 @@ plot_northness_eel <- ggplot(
   ) +
   theme_classic()
 
-# Add R²/n/slope label. Northness is a dimensionless index (-1 to 1),
-# so the slope is reported per unit northness rather than a physical unit.
+# Add R²/n/slope. Northness is a dimensionless index (-1 to 1),
+# so the slope is reported per unit northness
 plot_northness_eel <- annotate_lm(
   plot_northness_eel, mod_northness_eel, slope_unit = "mm/unit northness"
 )
@@ -189,11 +162,7 @@ plot_aspect_eel <- ggplot(
   theme_classic() +
   theme(legend.position = "top")
 
-# Per-aspect-group n label, added inline (this plot has 3 separate trend
-# lines, one per aspect_class, so a single pooled R²/slope would
-# misrepresent the individual lines -- per project decision, only n is
-# shown here, broken down per group since the group sizes may differ).
-# Same corner-position/fill styling as annotate_lm(), for consistency.
+# Per-aspect-group n label 
 plot_aspect_eel <- plot_aspect_eel +
   annotate(
     "label",
@@ -208,14 +177,7 @@ save_fig(plot_aspect_eel, "h2_eel_cwd_aspect_subset")
 
 # ---- Plot 3: slope x aspect -------------------------------------------------
 # Fixed y-axis limits, shared with Plot 3 in
-# 06_shading_artefact_appalachia.R for cross-region comparability. The
-# range spans BOTH regions: lower bound from Appalachia (137.7566), upper
-# bound from Eel River (826.7845), each read off range(mean_cwd) with the
-# same crop/filter/classification the plot uses. The two regions barely
-# overlap (Appalachia 137.8-171.4, Eel 533.9-826.8), so on a shared axis
-# each region's lines occupy only part of the range -- an accepted
-# trade-off for comparability. Re-read both ranges whenever the subset,
-# slope_min, or the class breaks change.
+# 06_shading_artefact_appalachia.R for cross-region comparability. 
 shared_y_limits_slope_aspect <- c(137.7566, 826.7845)
 
 plot_slope_aspect <- df |>
@@ -234,9 +196,7 @@ plot_slope_aspect <- df |>
   theme_classic() +
   theme(legend.position = "top")
 
-# Per-aspect-group n label (same counts as Plot 2, since both are based
-# on the full df -- each line here aggregates the same pixels into
-# per-slope-class means).
+# Per-aspect-group n label 
 plot_slope_aspect <- plot_slope_aspect +
   annotate(
     "label",
@@ -303,8 +263,6 @@ df_south_forest <- df |>
   dplyr::filter(aspect_class == "south-facing")
 
 # Plot
-# Explicit lm fit, matching geom_smooth() below, so annotate_lm() can
-# read off R²/n/slope.
 mod_twi_forest_south_eel <- lm(cwd_max ~ twi, data = df_south_forest)
 
 plot_twi_forest_south <- ggplot(
@@ -319,8 +277,7 @@ plot_twi_forest_south <- ggplot(
     y = expression(CWD[max]~"[mm]")) +
   theme_classic()
 
-# Add R²/n/slope label. TWI is dimensionless, so the slope is reported
-# per TWI unit rather than a physical unit.
+# Add R²/n/slope 
 plot_twi_forest_south <- annotate_lm(
   plot_twi_forest_south, mod_twi_forest_south_eel, slope_unit = "mm/TWI unit"
 )
@@ -330,15 +287,11 @@ save_fig(plot_twi_forest_south, "h2_eel_twi_forest_south_subset")
 
 # ---- Plot 7: TWI vs CWDmax, forest only, all aspects pooled -----------------
 # Test whether the shading bias is also present, when all aspects are pooled.
-# Reuses the shared df (already forest-filterable via nlcd), unlike the
-# Appalachia counterpart which re-samples independently for the larger region.
 
 df_forest_pooled <- df |>
   dplyr::filter(nlcd %in% c(41, 42, 43))   # deciduous/evergreen/mixed forest
 
 # Plot
-# Explicit lm fit, matching geom_smooth() below, so annotate_lm() can
-# read off R²/n/slope.
 mod_twi_forest_pooled_eel <- lm(cwd_max ~ twi, data = df_forest_pooled)
 
 plot_twi_forest_pooled <- ggplot(
@@ -353,8 +306,6 @@ plot_twi_forest_pooled <- ggplot(
     y = expression(CWD[max]~"[mm]")) +
   theme_classic()
 
-# Add R²/n/slope label. TWI is dimensionless, so the slope is reported
-# per TWI unit rather than a physical unit.
 plot_twi_forest_pooled <- annotate_lm(
   plot_twi_forest_pooled, mod_twi_forest_pooled_eel, slope_unit = "mm/TWI unit"
 )

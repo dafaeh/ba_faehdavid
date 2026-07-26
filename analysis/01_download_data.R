@@ -68,7 +68,7 @@ if (!file.exists(path_lanid)) {
 }
 
 # ---- TWI (topographic wetness index) ----------------------------------------
-# Always runs curl (no file.exists guard): at ~41 GB the download often breaks,
+# At ~41 GB the download eventually breaks,
 # and curl -C - resumes a partial file. If complete, curl exits without action.
 # If curl is unavailable, download manually from the DOI in the README.md and place 
 # into data-raw.

@@ -2,11 +2,7 @@
 # Tests H4 for the High Plains focus region: does CWDmax differ between
 # irrigated and rainfed cropland?
 # The classes are: Cropland irrigated and Cropland rainfed (NLCD 82 x LANID)
-#
-# LANID is the classification variable here, so no mask_irrigated() call:
-# irrigated pixels are a class, not something to exclude. The ifel() chain
-# below still drops pixels without LANID coverage (the condition evaluates to
-# NA there), matching the project-wide rule that uncovered pixels are unusable.
+
 
 # ---- Setup ------------------------------------------------------------------
 library(terra)
@@ -15,8 +11,6 @@ library(ggplot2)
 library(readr)
 library(here)
 
-# add_boxplot_n() adds per-group n to the boxplot below.
-# save_fig() writes each figure to fig/ as PDF and PNG (see R/save_fig.R).
 source(here("R", "add_boxplot_n.R"))
 source(here("R", "save_fig.R"))
 
@@ -44,8 +38,8 @@ class_irrigation <- terra::ifel(
 names(class_irrigation) <- "class"
 
 # Stratified sample
-# Irrigated and rainfed cropland end up comparably represented for the H4
-# group comparison, despite different areal shares.
+# Irrigated and rainfed cropland end up comparably represented for the
+# group comparison
 n_sample <- 100000
 
 sample_pts <- terra::spatSample(
@@ -74,15 +68,6 @@ df_sample <- dplyr::tibble(
     )
   ) |>
   dplyr::filter(!is.na(cwd_max))
-
-# ---- Quality filter ---------------------------------------------------------
-
-df_filtered <- df_sample
-
-# Eventually drop pixels with too many gap filled months, for example:
-
-# df_filtered <- df_sample |>
-#   dplyr::filter(gap_filled_months <= 6)
 
 # Boxplot
 plot_cropland_irrigation <- ggplot(

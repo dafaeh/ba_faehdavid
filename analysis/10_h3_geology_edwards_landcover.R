@@ -1,5 +1,5 @@
 # 10_h3_geology_edwards_landcover.R
-# Exploratory extension of 09_h3_geology_edwards_plateau.R: checks whether
+# Extension of 09_h3_geology_edwards_plateau.R: checks whether
 # the carbonate/clastic CWDmax contrast is hidden by the vegetation cover. 
 # To test this, it is differentiated between the 3 dominant vegetation classes 
 # on the Edwards Plateau: Grassland, Shrubland and Forest. 
@@ -12,8 +12,6 @@ library(ggplot2)
 library(readr)
 library(here)
 
-# mask_irrigated() applies the project-wide LANID rule (see R/lanid_filter.R).
-# save_fig() writes each figure to fig/ as PDF and PNG (see R/save_fig.R).
 source(here("R", "lanid_filter.R"))
 source(here("R", "save_fig.R"))
 
@@ -85,10 +83,7 @@ names(combined) <- "geo_class"
 
 # ---- Stratified sample on geology class -------------------------------------
 # n_per_class draws per geo_class stratum, not by area, so Clastic and
-# Carbonate are comparably represented. veg_class is not itself stratified:
-# within each geo_class, cell counts below reflect each vegetation type's
-# areal share, not enforced balance.
-
+# Carbonate are comparably represented. veg_class is not itself stratified
 sample_pts <- terra::spatSample(
   combined,
   size   = n_per_class,
@@ -117,8 +112,7 @@ df <- dplyr::tibble(
                        levels = seq_along(veg_levels),
                        labels = veg_levels)
   ) |>
-  # No filter on gap_filled_months: pixels are kept regardless of gap-fill
-  # count, consistent with 09_h3_geology_edwards_plateau.R.
+
   dplyr::filter(
     !is.na(cwd_max),
     !is.na(veg_class)
@@ -150,14 +144,7 @@ p <- ggplot(df, aes(x = veg_class, y = cwd_max, fill = geo_class)) +
     legend.position  = "bottom"
   )
 
-# Per-(veg_class x geo_class) n label. This boxplot is faceted by
-# veg_class and dodges two boxes (geo_class) within each facet, so a
-# single n per facet would not distinguish Clastic from Carbonate. Not
-# using add_boxplot_n() here: that function only groups by one variable
-# and does not handle position_dodge()/facet_wrap(), so the label
-# wouldn't line up with the correct box.
-# y position: facet_wrap(scales = "free_x") only frees the x scale, so
-# the y range is shared across facets and one global height is valid.
+# Per (veg_class x geo_class) n label.
 df_n <- df |>
   dplyr::count(veg_class, geo_class)
 

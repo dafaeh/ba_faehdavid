@@ -1,7 +1,6 @@
 # 09_h3_geology_edwards_plateau.R
 # Tests H3 for the Edwards Plateau focus region.
 # Compares CWDmax between carbonate and clastic geological substrates
-# (SGMC field GENERALIZED_LITH).
 
 # ---- Setup ------------------------------------------------------------------
 
@@ -12,9 +11,6 @@ library(ggplot2)
 library(readr)
 library(here)
 
-# add_boxplot_n() adds per-group n to the boxplot below.
-# mask_irrigated() applies the project-wide LANID rule (see R/lanid_filter.R).
-# save_fig() writes each figure to fig/ as PDF and PNG (see R/save_fig.R).
 source(here("R", "add_boxplot_n.R"))
 source(here("R", "lanid_filter.R"))
 source(here("R", "save_fig.R"))
@@ -56,7 +52,7 @@ names(geo_rast) <- "geo_class"
 
 # Exclude irrigated pixels and pixels without LANID coverage. Applied to the
 # class raster before sampling, so the strata already exclude them and no
-# further LANID handling is needed downstream.
+# further LANID handling is needed later on
 geo_rast <- mask_irrigated(geo_rast, lanid)
 
 # Stratified sample 

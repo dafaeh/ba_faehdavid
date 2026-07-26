@@ -3,9 +3,6 @@
 # land-use types?
 # The land-use types are: Cropland, Grassland and Shrubs
 #
-# No LANID filter at all here, unlike every other script: this is the
-# all-land-use case over the full NLCD classes, and
-# 12_h4_land_use_rainfed_high_plains.R is the rainfed counterpart.
 
 # ---- Setup ------------------------------------------------------------------
 library(terra)
@@ -74,15 +71,6 @@ df_sample <- dplyr::tibble(
   ) |>
   dplyr::filter(!is.na(cwd_max))
 
-
-# ---- Quality filter ---------------------------------------------------------
-
-df_filtered <- df_sample
-
-# Eventually drop pixels with too many gap filled months, for example:
-
-# df_filtered <- df_sample |>
-#   dplyr::filter(gap_filled_months <= 6)
 
 # Boxplot
 plot_land_use <- ggplot(
