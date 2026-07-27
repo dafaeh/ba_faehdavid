@@ -1,13 +1,9 @@
 # plot_dry_elder_sites.R
 # Single satellite map showing both H3 validation field sites
-# (Elder Creek, Dry Creek) with their hand-digitised catchment outlines.
+# (Elder Creek, Dry Creek) with the catchment outlines.
 
 # Polygons are delivered in NAD83 Contiguous USA Albers (parameter-identical to EPSG:5070) and are
 # back-transformed to WGS84 only for display on the satellite tiles.
-
-# Styling follows plot_focus_regions.R so that all satellite maps in the
-# thesis share the same look: theme_classic, identical scale bar / north
-# arrow, attribution drawn as a cowplot label, identical panel size.
 
 # ---- Setup --------------------------------------------------------------
 library(maptiles)
@@ -57,7 +53,7 @@ ymin <- box_wgs[["ymin"]]; ymax <- box_wgs[["ymax"]]
 ext   <- terra::ext(xmin, xmax, ymin, ymax)
 
 # Vertical label nudge (map degrees), converted from ~1 cm on the saved
-# figure using the y-extent and the ggsave() height below
+# figure using the y-extent and the ggsave() height 
 fig_height_cm  <- panel_h_cm
 deg_per_cm     <- (ymax - ymin) / fig_height_cm
 nudge_y_labels <- 0.012 + 0.5 * deg_per_cm
@@ -79,8 +75,7 @@ main_map <- ggplot() +
   geom_sf_text(data = labels_wgs, aes(label = site),
                colour = "white", size = 3, fontface = "bold",
                nudge_y = nudge_y_labels) +
-  # expand is left at its default (TRUE), as on the focus-region maps, so
-  # ggplot pads a visible gap between the axis lines and the map
+# visible gap between the axis lines and the map
   coord_sf(
     xlim = c(xmin, xmax),
     ylim = c(ymin, ymax),
@@ -95,8 +90,7 @@ main_map <- ggplot() +
     height     = grid::unit(0.12, "cm"),
     text_cex   = 0.8
   ) +
-  # "grid" to match the other maps. In EPSG:4326 grid north and true north
-  # coincide, so this changes nothing about where the arrow points.
+
   annotation_north_arrow(
     location    = "br",
     which_north = "grid",
