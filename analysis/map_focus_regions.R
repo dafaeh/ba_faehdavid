@@ -1,4 +1,4 @@
-# plot_focus_regions.R
+# map_focus_regions.R
 # Maps of the four BA focus regions and the Eel River subset
 
 # Extent and CRS are read from the exported cwd_max rasters.
@@ -95,13 +95,13 @@ make_region_map <- function(raster_path, title = NULL, zoom = 10,
       height     = grid::unit(0.12, "cm"),
       text_cex   = 0.8
     ) +
-
+    
     scale_x_continuous(breaks = scales::breaks_width(lon_break_width)) +
     labs(
       x = "Longitude",
       y = "Latitude"
     ) +
-
+    
     theme_classic(base_size = 13) +
     theme(
       axis.ticks        = element_line(colour = "grey30", linewidth = 0.4),
@@ -211,6 +211,20 @@ map_eel_subregion <- make_region_map(
   show_title       = FALSE
 )
 
+# Same panel for the combined figure, but titled and without the
+# attribution, which is drawn once for the whole figure there.
+map_eel_subregion_panel <- make_region_map(
+  raster_path = here("data", "eel_9ref.tif"),
+  title       = "Eel River (subset)",
+  lon_break_width = 0.5,
+  subset_bbox = c(
+    xmin = -2336730, xmax = -2229380,
+    ymin =  2138000, ymax =  2366160
+  ),
+  show_inset       = FALSE,
+  show_attribution = FALSE
+)
+
 # ---- Display ------------------------------------------------------------------
 map_eel
 map_texas
@@ -231,12 +245,17 @@ ggsave(here("fig", "map_appalachians.png"), plot = map_appalachians,
 ggsave(here("fig", "map_eel_subregion.png"), plot = map_eel_subregion,
        width = panel_w_cm, height = panel_h_cm, units = "cm", dpi = 600)
 
-# ---- Save combined 4-panel figure ----------------------------------------------
+# ---- Save combined 5-panel figure ----------------------------------------------
+# NULL fills the sixth slot, otherwise the fifth panel is stretched across
+# the full bottom row. Empty label so no "f" is drawn into the gap.
 fig_regions <- plot_grid(
   map_eel, map_texas, map_highplains, map_appalachians,
-  labels = "auto", ncol = 2
+  map_eel_subregion_panel, NULL,
+  labels = c("a", "b", "c", "d", "e", ""),
+  ncol   = 2
 )
 
+# Bottom right is the empty slot, where grey on white stays readable.
 fig_regions <- ggdraw(fig_regions) +
   draw_label(
     "\u00a9 Esri World Imagery",
@@ -244,13 +263,13 @@ fig_regions <- ggdraw(fig_regions) +
     size = 6, colour = "grey40"
   )
 
-# 2 x 2 panels at exactly the single-map size, so the scale bar, north
+# 2 x 3 panels at exactly the single-map size, so the scale bar, north
 # arrow and axis text look the same here as on the single maps.
 ggsave(here("fig", "map_focus_regions_combined.pdf"), plot = fig_regions,
-       width = 2 * panel_w_cm, height = 2 * panel_h_cm, units = "cm",
+       width = 2 * panel_w_cm, height = 3 * panel_h_cm, units = "cm",
        dpi = 600)
 
 # PNG version of the same combined figure 
 ggsave(here("fig", "map_focus_regions_combined.png"), plot = fig_regions,
-       width = 2 * panel_w_cm, height = 2 * panel_h_cm, units = "cm",
+       width = 2 * panel_w_cm, height = 3 * panel_h_cm, units = "cm",
        dpi = 600)

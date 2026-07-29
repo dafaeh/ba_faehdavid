@@ -134,7 +134,7 @@ p <- ggplot(df, aes(x = veg_class, y = cwd_max, fill = geo_class)) +
   facet_wrap(~ veg_class, scales = "free_x", nrow = 1) +
   labs(
     x = NULL,
-    y = expression(CWD[max]~"(mm)")
+    y = expression(CWD[max]~"[mm]")
   ) +
   theme_classic() +
   theme(

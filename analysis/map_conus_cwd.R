@@ -86,18 +86,37 @@ p_bar_gap <- ggplot(df_sample, aes(x = gap_filled_months)) +
   theme_classic()
 p_bar_gap
 
+# ---- Combined figure: gap-filled months -------------------------------------
+# Map and distribution as one thesis figure. Titles are dropped here, the
+# caption describes both panels.
+p_gap_combined <- cowplot::plot_grid(
+  p_map_gap + labs(title = NULL),
+  p_bar_gap,
+  ncol        = 1,
+  labels      = "auto",
+  align       = "v",
+  axis        = "lr",          # panel edges stay flush despite the map legend
+  rel_heights = c(1.6, 1)
+)
+p_gap_combined
+
 # ---- Save -------------------------------------------------------------------
 ggsave(here("fig", "map_cwd_max_conus.pdf"), p_map_cwd,
        width = 20, height = 14, units = "cm")
 ggsave(here("fig", "map_cwd_max_conus.png"), p_map_cwd,
-       width = 20, height = 14, units = "cm", dpi = 300)
+       width = 20, height = 14, units = "cm", dpi = 600)
 
 ggsave(here("fig", "map_gap_filled_conus.pdf"), p_map_gap,
        width = 20, height = 14, units = "cm")
 ggsave(here("fig", "map_gap_filled_conus.png"), p_map_gap,
-       width = 20, height = 14, units = "cm", dpi = 300)
+       width = 20, height = 14, units = "cm", dpi = 600)
 
 ggsave(here("fig", "bar_gap_filled_conus.pdf"), p_bar_gap,
        width = 16, height = 10, units = "cm")
 ggsave(here("fig", "bar_gap_filled_conus.png"), p_bar_gap,
-       width = 16, height = 10, units = "cm", dpi = 300)
+       width = 16, height = 10, units = "cm", dpi = 600)
+
+ggsave(here("fig", "gap_filled_conus_combined.pdf"), p_gap_combined,
+       width = 18, height = 16, units = "cm")
+ggsave(here("fig", "gap_filled_conus_combined.png"), p_gap_combined,
+       width = 18, height = 16, units = "cm", dpi = 600)

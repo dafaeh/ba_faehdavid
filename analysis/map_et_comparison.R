@@ -1,11 +1,11 @@
-# plot_et_comparison.R
-# Two side-by-side raster maps comparing OpenET Ensemble and DisALEXI
-# annual-mean ET for the AOI exported by export_et_comparison.js.
-# Shared colour scale (80 to 120 mm) taken from the etVis palette used
-# for the GEE Code Editor inspection.
+# map_et_cwd_grid.R
+# 2 x 2 panel figure: DisALEXI and OpenET Ensemble annual-mean ET 2021 in the
+# top row, DisALEXI-based CWD_max 2020-2022 bottom left, bottom right empty.
+# The ET window is a subset of the Eel River focus region, so CWD_max is
+# cropped out of the focus region export.
 
 
-# ---- Setup --------------------------------------------------------------
+# ---- Setup ------------------------------------------------------------------
 library(terra)
 library(tidyterra)
 library(ggplot2)
@@ -14,84 +14,128 @@ library(cowplot)
 library(sf)
 library(here)
 
-# Load raster
-r_et <- terra::rast(here("data-raw", "et_comparison_2021.tif"))
+# ---- Load data --------------------------------------------------------------
+r_et      <- terra::rast(here("data-raw", "et_comparison_2021.tif"))
+r_cwd_eel <- terra::rast(here("data", "eel_9ref.tif"))[["cwd_max"]]
 
-# Shared scale limits for optimal contrast
-et_limits <- c(80, 120)
+# ---- Crop CWD_max to the ET window ------------------------------------------
+# Both rasters come out of the same export settings (EPSG:5070, 30 m), so a
+# plain crop is enough. The fallback reprojects onto the ET grid, bilinear
+# because CWD_max is continuous.
+if (terra::same.crs(r_cwd_eel, r_et)) {
+  r_cwd <- terra::crop(r_cwd_eel, terra::ext(r_et))
+} else {
+  poly_et <- terra::project(
+    terra::as.polygons(terra::ext(r_et), crs = terra::crs(r_et)),
+    terra::crs(r_cwd_eel)
+  )
+  r_cwd <- terra::project(
+    terra::crop(r_cwd_eel, poly_et),
+    r_et,
+    method = "bilinear"
+  )
+}
 
-# Use a function to build the maps
-make_et_map <- function(band_name, limits) {
+# ---- Colour scale limits ----------------------------------------------------
+et_limits  <- c(80, 120)     # shared by both ET panels
+cwd_limits <- c(610, 1080)   # 2nd/98th percentile of the cropped raster
+
+# ---- Map annotations --------------------------------------------------------
+# ggspatial sizes these in absolute units, so they do not shrink with the panel.
+# which_north = "grid" keeps the arrow straight up; true north looks skewed
+# under Albers away from the central meridian.
+layer_scalebar <- annotation_scale(
+  location   = "bl",
+  width_hint = 0.32,
+  style      = "bar",
+  bar_cols   = c("black", "white"),
+  height     = grid::unit(0.1, "cm"),
+  pad_x      = grid::unit(0.15, "cm"),
+  pad_y      = grid::unit(0.12, "cm"),
+  text_pad   = grid::unit(0.08, "cm"),
+  text_cex   = 0.55,
+  line_width = 0.4
+)
+
+layer_north_arrow <- annotation_north_arrow(
+  location    = "br",
+  which_north = "grid",
+  height      = grid::unit(0.5, "cm"),
+  width       = grid::unit(0.5, "cm"),
+  pad_x       = grid::unit(0.15, "cm"),
+  pad_y       = grid::unit(0.15, "cm"),
+  style       = north_arrow_fancy_orienteering(
+    fill       = c("black", "grey40"),
+    line_col   = "grey20",
+    line_width = 0.5,
+    text_size  = 5
+  )
+)
+
+# ---- Map function -----------------------------------------------------------
+make_map <- function(r, band_name, limits, legend_name) {
   
   ggplot() +
-    tidyterra::geom_spatraster(data = r_et, aes(fill = .data[[band_name]])) +
+    tidyterra::geom_spatraster(data = r, aes(fill = .data[[band_name]])) +
     scale_fill_viridis_c(
-      name      = expression(ET~"(mm)"),
+      name      = legend_name,
       limits    = limits,
-      direction = -1,            # reversed: dark = high ET
+      direction = -1,            # reversed: dark = high values
       oob       = scales::squish,
       na.value  = NA
     ) +
+    # Default axis expansion, so the scale bar sits in the margin below the
+    # raster rather than on top of it.
+    scale_x_continuous(breaks = scales::breaks_pretty(n = 3)) +
+    scale_y_continuous(breaks = scales::breaks_pretty(n = 3)) +
     # Native CRS of the raster, no reprojection. datum = 4326 keeps the
     # graticule and axis labels in degrees.
     coord_sf(
-      crs    = terra::crs(r_et),
-      datum  = sf::st_crs(4326),
-      expand = FALSE
+      crs   = terra::crs(r),
+      datum = sf::st_crs(4326)
     ) +
-
-    annotation_scale(
-      location   = "bl",
-      width_hint = 0.15,
-      style      = "bar",
-      bar_cols   = c("black", "white"),
-      height     = grid::unit(0.12, "cm"),
-      text_cex   = 0.8
-    ) +
-    annotation_north_arrow(
-      location    = "br",
-      which_north = "grid",
-      style       = north_arrow_fancy_orienteering(
-        fill     = c("white", "grey40"),
-        line_col = "grey20",
-        text_col = "white"
-      ),
-      height = unit(0.8, "cm"),
-      width  = unit(0.8, "cm")
-    ) +
-
-    scale_x_continuous(breaks = scales::breaks_pretty(n = 3)) +
-    scale_y_continuous(breaks = scales::breaks_pretty(n = 3)) +
+    
+    layer_scalebar +
+    layer_north_arrow +
+    
     labs(x = "Longitude", y = "Latitude") +
     theme_classic(base_size = 13) +
     theme(
       axis.ticks        = element_line(colour = "grey30", linewidth = 0.4),
       axis.ticks.length = unit(0.15, "cm"),
       axis.text         = element_text(size = 8),
-      axis.text.x       = element_text(angle = 45, hjust = 1),
       axis.title        = element_text(size = 11)
     )
 }
 
-# Generate maps
-map_disalexi <- make_et_map("et_disalexi", et_limits)
-map_ensemble <- make_et_map("et_ensemble", et_limits)
+# ---- Build panels -----------------------------------------------------------
+map_disalexi <- make_map(r_et,  "et_disalexi", et_limits,
+                         expression(ET~"[mm]"))
+map_ensemble <- make_map(r_et,  "et_ensemble", et_limits,
+                         expression(ET~"[mm]"))
+map_cwd      <- make_map(r_cwd, "cwd_max",     cwd_limits,
+                         expression(CWD[max]~"[mm]"))
 
-# Display
-map_disalexi
-map_ensemble
-
-# Save single panels
-ggsave(here("fig", "map_et_disalexi.png"), plot = map_disalexi,
-       width = 10, height = 8, units = "in", dpi = 600)
-ggsave(here("fig", "map_et_ensemble.png"), plot = map_ensemble,
-       width = 10, height = 8, units = "in", dpi = 600)
-
-# Save combined 2-panel figure
-fig_et_comparison <- plot_grid(
+# ---- Assemble figure --------------------------------------------------------
+# align/axis keep all panels the same size despite the wider CWD_max legend.
+# NULL leaves the bottom-right cell empty, the empty label suppresses its tag.
+fig_et_cwd_grid <- plot_grid(
   map_disalexi, map_ensemble,
-  labels = "auto", ncol = 2
+  map_cwd,      NULL,
+  ncol   = 2,
+  labels = c("a", "b", "c", ""),
+  align  = "hv",
+  axis   = "tblr"
 )
 
-ggsave(here("fig", "map_et_comparison.png"), plot = fig_et_comparison,
-       width = 24, height = 10, units = "cm", dpi = 600)
+fig_et_cwd_grid
+
+# ---- Save -------------------------------------------------------------------
+# PNG rather than PDF: the dense 30 m rasters bloat vector output.
+ggsave(
+  filename = here("fig", "map_et_cwd_grid.png"),
+  plot     = fig_et_cwd_grid,
+  device   = ragg::agg_png,
+  width    = 24, height = 20, units = "cm",
+  dpi      = 600
+)

@@ -21,7 +21,6 @@ set.seed(42)
 # Load data
 path_cwd    <- here("data", "appalachia_9ref.tif")
 path_stack  <- here("data", "stack_appalachia.tif")
-path_pixels <- here("data", "h1_h2_appalachia_pixels.csv")
 
 # Define sample size
 n_sample    <- 1000000
@@ -89,7 +88,7 @@ print(broom::glance(mod_h2)[c("r.squared", "adj.r.squared")])
 plot_cwd_twi <- ggplot(df, aes(x = twi, y = cwd_max)) +
   geom_hex(bins = 60) +
   scale_fill_viridis_c(name = "n Pixel", trans = "log10") +
-  geom_smooth(method = "lm", colour = "firebrick", linewidth = 0.9) +
+  geom_smooth(method = "lm", colour = "firebrick", linewidth = 0.9, se = FALSE) +
   geom_smooth(method = "gam", formula = y ~ s(x), colour = "black",
               linewidth = 0.9, linetype = "dashed") +
   labs(

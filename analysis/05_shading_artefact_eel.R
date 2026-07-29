@@ -178,7 +178,7 @@ save_fig(plot_aspect_eel, "h2_eel_cwd_aspect_subset")
 # ---- Plot 3: slope x aspect -------------------------------------------------
 # Fixed y-axis limits, shared with Plot 3 in
 # 06_shading_artefact_appalachia.R for cross-region comparability. 
-shared_y_limits_slope_aspect <- c(137.7566, 826.7845)
+shared_y_limits_slope_aspect <- c(137, 826)
 
 plot_slope_aspect <- df |>
   group_by(aspect_class, slope_class) |>
@@ -272,6 +272,8 @@ plot_twi_forest_south <- ggplot(
   scale_fill_viridis_c(trans = "log10", name = "n (log10)") +
   geom_smooth(method = "lm", formula = y ~ x,
               se = FALSE, colour = "red", linewidth = 0.9) +
+  geom_smooth(method = "gam", formula = y ~ s(x), colour = "black",
+              linewidth = 0.9, linetype = "dashed") +
   labs(
     x = "TWI",
     y = expression(CWD[max]~"[mm]")) +
@@ -301,6 +303,8 @@ plot_twi_forest_pooled <- ggplot(
   scale_fill_viridis_c(trans = "log10", name = "n (log10)") +
   geom_smooth(method = "lm", formula = y ~ x,
               se = FALSE, colour = "red", linewidth = 0.9) +
+  geom_smooth(method = "gam", formula = y ~ s(x), colour = "black",
+              linewidth = 0.9, linetype = "dashed") +
   labs(
     x = "TWI",
     y = expression(CWD[max]~"[mm]")) +

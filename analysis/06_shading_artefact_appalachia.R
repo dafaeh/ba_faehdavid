@@ -2,7 +2,7 @@
 # This script works in the same way as the 05_shading_artefact_eel.R one but 
 # for the appalachians focus region. 
 
-# A shlightly different approach is used when filtering for high-quality pixels 
+# A slightly different approach is used when filtering for high-quality pixels
 # only. Instead of using a Geology polygon to filter, the NLCD raster is used
 # to filter for forest pixels.
 
@@ -54,6 +54,9 @@ df_raw <- terra::spatSample(
 
 # LANID value per sampled pixel, used by the drop_irrigated() call below.
 df_raw$lanid <- terra::extract(lanid, as.matrix(df_raw[, c("x", "y")]))$lanid
+
+# NLCD land cover, extracted here for the forest filter used in Plots 6 and 7.
+df_raw$nlcd  <- terra::extract(nlcd, as.matrix(df_raw[, c("x", "y")]))$nlcd
 
 # Derive classification variables used in the plots below:
 # aspect_class buckets northness into south-/east-west-/north-facing
@@ -164,8 +167,10 @@ save_fig(plot_aspect_appalachia, "h2_appalachia_cwd_aspect")
 
 # ---- Plot 3: slope x aspect ------------------------------------------------
 # Fixed y-axis limits, shared with Plot 3 in
-# 06_shading_artefact_appalachia.R for cross-region comparability. 
-shared_y_limits_slope_aspect <- c(137.7566, 826.7845)
+# 05_shading_artefact_eel.R for cross-region comparability.
+# NOTE: 05 currently uses c(137.7566, 826.7845), so the two axes are not
+# strictly identical. Harmonise before the figures go into the thesis.
+shared_y_limits_slope_aspect <- c(137, 826)
 
 plot_slope_aspect <- df |>
   group_by(aspect_class, slope_class) |>
@@ -240,38 +245,12 @@ save_fig(plot_slope_aspect, "h2_appalachia_slope_aspect")
 # save_fig(plot_cwd_slope_class, "h2_appalachia_cwd_by_slope")
 
 # ---- Plot 6: TWI vs CWDmax, south-facing forest only ------------------------
-# Isolate high-quality pixels: south-facing (least affected by the shading) 
-# and forest only, to check whether a TWI-CWDmax signal emerges once aspect and land cover are held
-# constant. Re-samples independently rather than reusing the shared df: over
-# the full Appalachia stack as.data.frame() runs out of memory. slope is only
-# carried along to reapply the slope_min filter.
-stack_forest <- c(cwd, twi, northness, slope, nlcd, lanid)
-names(stack_forest) <- c("cwd_max", "twi", "northness", "slope", "nlcd", "lanid")
+# Isolate high-quality pixels: south-facing (least affected by the shading)
+# and forest only, to check whether a TWI-CWDmax signal emerges once aspect
+# and land cover are held constant.
 
-df_forest_raw <- terra::spatSample(
-  stack_forest,
-  size   = n_sample * 2,
-  method = "regular",
-  na.rm  = FALSE,
-  xy     = TRUE,
-  as.df  = TRUE
-) |>
-  tibble::as_tibble()
-
-# Remove irrigated pixels and filter for south facing forest pixels only
-df_forest <- df_forest_raw |>
-  drop_irrigated() |>
+df_forest <- df |>
   dplyr::filter(nlcd %in% c(41, 42, 43)) |>   # deciduous/evergreen/mixed forest
-  tidyr::drop_na(cwd_max, twi, northness, slope) |>
-  dplyr::filter(slope >= slope_min) |>
-  dplyr::mutate(
-    aspect_class = cut(
-      northness,
-      breaks         = c(-1, -0.33, 0.33, 1),
-      labels         = c("south-facing", "east/west", "north-facing"),
-      include.lowest = TRUE
-    )
-  ) |>
   dplyr::filter(aspect_class == "south-facing")
 
 # Plot
@@ -284,6 +263,8 @@ plot_twi_forest_south <- ggplot(
   scale_fill_viridis_c(trans = "log10", name = "n (log10)") +
   geom_smooth(method = "lm", formula = y ~ x,
               se = FALSE, colour = "red", linewidth = 0.9) +
+  geom_smooth(method = "gam", formula = y ~ s(x), colour = "black",
+              linewidth = 0.9, linetype = "dashed") +
   labs(
     x = "TWI",
     y = expression(CWD[max]~"[mm]")) +
@@ -299,28 +280,10 @@ save_fig(plot_twi_forest_south, "h2_appalachia_twi_forest_south")
 
 # ---- Plot 7: TWI vs CWDmax, forest only, all aspects pooled -----------------
 # Test whether the shading bias is also present, when all aspects are pooled.
-# Same slope_min filter as everywhere else, so the pooled subset differs from
-# Plot 6 only in the aspect filter.
+# Differs from Plot 6 only in that the aspect filter is dropped.
 
-stack_forest_pooled <- c(cwd, twi, northness, slope, nlcd, lanid)
-names(stack_forest_pooled) <- c("cwd_max", "twi", "northness", "slope", "nlcd", "lanid")
-
-df_forest_pooled_raw <- terra::spatSample(
-  stack_forest_pooled,
-  size   = n_sample * 2,
-  method = "regular",
-  na.rm  = FALSE,
-  xy     = TRUE,
-  as.df  = TRUE
-) |>
-  tibble::as_tibble()
-
-# Remove irrigated pixels and filter for forest pixels only
-df_forest_pooled <- df_forest_pooled_raw |>
-  drop_irrigated() |>
-  dplyr::filter(nlcd %in% c(41, 42, 43)) |> 
-  tidyr::drop_na(cwd_max, twi, northness, slope) |>
-  dplyr::filter(slope >= slope_min)
+df_forest_pooled <- df |>
+  dplyr::filter(nlcd %in% c(41, 42, 43))   # deciduous/evergreen/mixed forest
 
 # Plot
 mod_twi_forest_pooled_appalachia <- lm(cwd_max ~ twi, data = df_forest_pooled)
@@ -332,6 +295,8 @@ plot_twi_forest_pooled <- ggplot(
   scale_fill_viridis_c(trans = "log10", name = "n (log10)") +
   geom_smooth(method = "lm", formula = y ~ x,
               se = FALSE, colour = "red", linewidth = 0.9) +
+  geom_smooth(method = "gam", formula = y ~ s(x), colour = "black",
+              linewidth = 0.9, linetype = "dashed") +
   labs(
     x = "TWI",
     y = expression(CWD[max]~"[mm]")) +
