@@ -1,5 +1,5 @@
 # map_focus_regions.R
-# Maps of the four BA focus regions and the Eel River subset
+# Maps of the four BA focus regions and the Northern California subset
 
 # Extent and CRS are read from the exported cwd_max rasters.
 # Maps are drawn in EPSG:5070, datum = 4326 keeps
@@ -180,10 +180,14 @@ make_region_map <- function(raster_path, title = NULL, zoom = 10,
 }
 
 # ---- Generate maps ----------------------------------------------------------
-map_eel <- make_region_map(
+map_norcal <- make_region_map(
   raster_path = here("data", "eel_9ref.tif"),
-  title       = "Eel River",
-  lon_break_width = 0.5
+  title       = "Northern California",
+  lon_break_width = 0.5,
+  subset_bbox = c(
+    xmin = -2336730, xmax = -2229380,
+    ymin =  2138000, ymax =  2366160
+  )
 )
 map_texas <- make_region_map(
   raster_path = here("data", "edwards_plateau_9ref.tif"),
@@ -198,42 +202,20 @@ map_appalachians <- make_region_map(
   title       = "Appalachians"
 )
 
-# Eel River sub-region
-map_eel_subregion <- make_region_map(
-  raster_path = here("data", "eel_9ref.tif"),
-  lon_break_width = 0.5,
-  subset_bbox = c(
-    xmin = -2336730, xmax = -2229380,
-    ymin =  2138000, ymax =  2366160
-  ),
-  show_inset       = FALSE,
-  show_attribution = TRUE,
-  show_title       = FALSE
-)
-
-# Same panel for the combined figure, but titled and without the
-# attribution, which is drawn once for the whole figure there.
-map_eel_subregion_panel <- make_region_map(
-  raster_path = here("data", "eel_9ref.tif"),
-  title       = "Eel River (subset)",
-  lon_break_width = 0.5,
-  subset_bbox = c(
-    xmin = -2336730, xmax = -2229380,
-    ymin =  2138000, ymax =  2366160
-  ),
-  show_inset       = FALSE,
-  show_attribution = FALSE
-)
-
 # ---- Display ------------------------------------------------------------------
-map_eel
+map_norcal
 map_texas
 map_highplains
 map_appalachians
-map_eel_subregion
 
 # ---- Save single panels --------------------------------------------------------
-ggsave(here("fig", "map_eel_river.png"),    plot = map_eel,
+ggsave(here("fig", "map_northern_california.png"),
+       plot = map_norcal +
+         draw_label(
+           "\u00a9 Esri World Imagery",
+           x = 0.99, y = 0.01, hjust = 1, vjust = 0,
+           size = 6, colour = "grey40"
+         ),
        width = panel_w_cm, height = panel_h_cm, units = "cm", dpi = 600)
 ggsave(here("fig", "map_texas.png"),        plot = map_texas,
        width = panel_w_cm, height = panel_h_cm, units = "cm", dpi = 600)
@@ -242,20 +224,13 @@ ggsave(here("fig", "map_highplains.png"),   plot = map_highplains,
 ggsave(here("fig", "map_appalachians.png"), plot = map_appalachians,
        width = panel_w_cm, height = panel_h_cm, units = "cm", dpi = 600)
 
-ggsave(here("fig", "map_eel_subregion.png"), plot = map_eel_subregion,
-       width = panel_w_cm, height = panel_h_cm, units = "cm", dpi = 600)
-
-# ---- Save combined 5-panel figure ----------------------------------------------
-# NULL fills the sixth slot, otherwise the fifth panel is stretched across
-# the full bottom row. Empty label so no "f" is drawn into the gap.
+# ---- Save combined 4-panel figure ----------------------------------------------
 fig_regions <- plot_grid(
-  map_eel, map_texas, map_highplains, map_appalachians,
-  map_eel_subregion_panel, NULL,
-  labels = c("a", "b", "c", "d", "e", ""),
+  map_norcal, map_texas, map_highplains, map_appalachians,
+  labels = c("a", "b", "c", "d"),
   ncol   = 2
 )
 
-# Bottom right is the empty slot, where grey on white stays readable.
 fig_regions <- ggdraw(fig_regions) +
   draw_label(
     "\u00a9 Esri World Imagery",
@@ -263,13 +238,13 @@ fig_regions <- ggdraw(fig_regions) +
     size = 6, colour = "grey40"
   )
 
-# 2 x 3 panels at exactly the single-map size, so the scale bar, north
+# 2 x 2 panels at exactly the single-map size, so the scale bar, north
 # arrow and axis text look the same here as on the single maps.
 ggsave(here("fig", "map_focus_regions_combined.pdf"), plot = fig_regions,
-       width = 2 * panel_w_cm, height = 3 * panel_h_cm, units = "cm",
+       width = 2 * panel_w_cm, height = 2 * panel_h_cm, units = "cm",
        dpi = 600)
 
 # PNG version of the same combined figure 
 ggsave(here("fig", "map_focus_regions_combined.png"), plot = fig_regions,
-       width = 2 * panel_w_cm, height = 3 * panel_h_cm, units = "cm",
+       width = 2 * panel_w_cm, height = 2 * panel_h_cm, units = "cm",
        dpi = 600)

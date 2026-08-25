@@ -13,11 +13,6 @@
 # Grid: <region>_9ref.tif defines the template (EPSG:5070, 30 m). Every band is
 # resampled onto it.
 
-# If you want to add a region: export it from GEE, place its exports in
-# data/ (<region>_9ref.tif etc.), add its name below, re-run. No coordinates
-# are needed here -- every region's extent and CRS come from its exported
-# <region>_9ref.tif grid template, so this script and the GEE exports can
-# never drift out of sync.
 
 # ---- Setup ------------------------------------------------------------------
 library(terra)
