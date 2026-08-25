@@ -1,4 +1,4 @@
-# Bachelor Thesis: High-Resolution Mapping of Cumulative Water Deficits across the Contiguous United States
+# Bachelor Thesis: The cumulative water deficit at 30 m across the contiguous United States – Spatial patterns and landscape controls.
 
 **Degree program:** Geography
 
@@ -47,7 +47,8 @@ The workflow is separated into two sections.
 1. The data for the analysis is generated using GEE. See `gee/README.md`
    for details and execute these steps first.
 2. Once the GEE outputs are stored in `data/`, run the scripts in
-   `analysis/` in their numerical order.
+   `analysis/` in their numerical order to produce the plots used in the thesis and 
+   assemble the CONUS-wide CWDmax map.
 3. The maps that were used in the thesis can be reproduced using the scripts in 
   `analysis/maps/`
 
