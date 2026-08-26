@@ -52,5 +52,9 @@ rsconnect/
 *.tif
 *.tiff
 *.nc
-data/
-data-raw/
+
+data/*
+!data/.gitkeep
+
+data-raw/*
+!data-raw/.gitkeep
