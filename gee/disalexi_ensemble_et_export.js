@@ -1,4 +1,4 @@
-// export_et_comparison.js
+// disalexi_ensemble_et_export.js
 // Exports raw mean monthly ET from OpenET Ensemble and DisALEXI for a
 // single AOI, to compare DisALEXI against the ensemble mean.
 // This is a diagnostic script, not part of the main cwd_max pipeline.

@@ -12,7 +12,7 @@
 // circles instead of straight lines in the projected CRS.
 
 exports.SITES = {
-  eel: ee.Geometry.Rectangle(
+  northern_california: ee.Geometry.Rectangle(
     [-2337810, 2089020, -2060790, 2366130], 'EPSG:5070', false
   ),
 

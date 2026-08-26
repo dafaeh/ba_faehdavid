@@ -22,7 +22,7 @@ have to be transformed to EPSG:5070 first.
 ### `main.js` for focus regions
 
 Computes CWDmax for the focus regions defined in `cfg.SITES`. Exports to
-Google Drive (folder `cfg.EXPORT_FOLDER`); tasks must be started manually
+Google Drive (folder `cfg.EXPORT_FOLDER`). Tasks must be started manually
 in the Tasks tab.
 
 ### `main_conus.js` for the CONUS-wide map
