@@ -1,4 +1,4 @@
-# 10_h3_geology_edwards_landcover.R
+# 09_h3_geology_edwards_landcover.R
 # Extension of 09_h3_geology_edwards_plateau.R: checks whether
 # the carbonate/clastic CWDmax contrast is hidden by the vegetation cover. 
 # To test this, it is differentiated between the 3 dominant vegetation classes 
@@ -21,7 +21,7 @@ n_per_class <- 100000   # stratified sample per geology class (before veg split)
 
 
 # Load CWD raster
-r     <- terra::rast(here("data", "edwards_plateau_9ref.tif"))
+r     <- terra::rast(here("data", "cwd_edwards_plateau.tif"))
 r_cwd <- r[["cwd_max"]]
 
 

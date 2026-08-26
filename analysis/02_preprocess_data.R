@@ -10,7 +10,7 @@
 #                              because different classifications are needed for 
 #                              different analyses.
 
-# Grid: <region>_9ref.tif defines the template (EPSG:5070, 30 m). Every band is
+# Grid: cwd_<region>.tif defines the template (EPSG:5070, 30 m). Every band is
 # resampled onto it.
 
 
@@ -26,14 +26,14 @@ nlcd_url <- "/vsicurl/https://storage.googleapis.com/feddata-r/nlcd/2019_Land_Co
 
 # ---- Focus regions ----------------------------------------------------------
 # Just the names. Each region's extent/CRS is read from its exported grid
-# template <region>_9ref.tif, not from hardcoded coordinates.
-focus_regions <- c("eel", "edwards_plateau", "appalachia", "high_plains")
-
+# template cwd_<region>.tif, not from hardcoded coordinates.
+focus_regions <- c("northern_california", "edwards_plateau",
+                   "appalachia", "high_plains")
 # ---- Helpers ----------------------------------------------------------------
 
 # Path to a region's CWD grid template.
 template_path <- function(region) {
-  here("data", paste0(region, "_9ref.tif"))
+  here("data", paste0("cwd_", region, ".tif"))
 }
 
 # Crop to the region first (template extent reprojected into the raster's
@@ -62,11 +62,11 @@ for (region in focus_regions) {
   template <- terra::rast(path_template)[[1]]   # any band defines the grid
   
   # ---- elevation, northness, slope --------------------------------------
-  path_elev <- here("data", paste0("elevation_", region, ".tif"))
+  path_elev <- here("data-raw", paste0("elevation_", region, ".tif"))
   if (!file.exists(path_elev)) {
     stop(
       "Missing ", path_elev, ". Export elevation for '", region,
-      "' from GEE and place it in data/ before running this script."
+      "' from GEE and place it in data-raw/ before running this script."
     )
   }
   

@@ -31,7 +31,7 @@ panel_h_cm <- 12
 # No LANID filter here because the catchments do not feature irrigated pixels
 
 # Load raster
-r_cwd <- terra::rast(here("data", "eel_9ref.tif"))[["cwd_max"]]
+r_cwd <- terra::rast(here("data", "cwd_northern_california.tif"))[["cwd_max"]]
 
 # ---- Load hand-drawn catchment polygons -------------------------------------
 # Outlines are in NAD83 CONUS Albers (parameter-identical to the raster's

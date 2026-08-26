@@ -1,7 +1,7 @@
 # 04_h1_h2_topography_appalachia.R
 # This Script tests H1 (CWDmax decreases with elevation) and H2 (valley bottoms show
 # higher CWDmax than ridges) for the Appalachian focus region. It works in the
-# exact same manner as the 03_h1_h2_topography_eel.R script.
+# exact same manner as the 03_h1_h2_topography_northern_california.R script.
 
 # ---- Setup ------------------------------------------------------------------
 library(terra)
@@ -19,7 +19,7 @@ source(here("R", "save_fig.R"))
 set.seed(42) 
 
 # Load data
-path_cwd    <- here("data", "appalachia_9ref.tif")
+path_cwd    <- here("data", "cwd_appalachia.tif")
 path_stack  <- here("data", "stack_appalachia.tif")
 
 # Define sample size

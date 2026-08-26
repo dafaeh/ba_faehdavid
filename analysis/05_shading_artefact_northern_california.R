@@ -1,8 +1,7 @@
-# 05_shading_artefact_eel.R
-# Provides evidence that a topographic shading artefact in DisALEXI prevents
-# robust testing of H1 and H2 in the Eel River focus region.
-#
-# Restricted to eel_shading_subset
+# 05_shading_artefact_northern_california.R
+# Script to find out whether topographic shading systematically influences DisALEXI ET data.
+# The Northern California subset is used because it has pronounced ridge and 
+# valley structures.
 
 # ---- Setup ------------------------------------------------------------------
 library(terra)
@@ -27,11 +26,11 @@ aspect_colours <- c(
 )
 
 # Load data
-cwd       <- terra::rast(here("data", "eel_9ref.tif"))[["cwd_max"]]
+cwd       <- terra::rast(here("data", "cwd_northern_california.tif"))[["cwd_max"]]
 
-stack_pre <- terra::rast(here("data", "stack_eel.tif"))
+stack_pre <- terra::rast(here("data", "stack_northern_california.tif"))
 
-# Restrict to eel_subset
+# Restrict to northern_california_subset
 ext_subset <- terra::ext(
   -2336730, -2229380, 
   2138000,  2366160 
@@ -111,7 +110,7 @@ df <- df_raw |>
   )
 
 # Sample size per aspect class, used to annotate Plots 2 and 3 below.
-label_n_aspect_eel <- df |>
+label_n_aspect_norcal <- df |>
   dplyr::count(aspect_class) |>
   dplyr::mutate(line = paste0(aspect_class, ": n = ", format(n, big.mark = "'"))) |>
   dplyr::pull(line) |>
@@ -120,9 +119,9 @@ label_n_aspect_eel <- df |>
 # ---- Plot 1: CWDmax vs northness --------------------------------------------
 # lm fit, matching the formula used by geom_smooth() below, so
 # R²/n/slope can be read off with annotate_lm().
-mod_northness_eel <- lm(cwd_max ~ northness, data = df)
+mod_northness_norcal <- lm(cwd_max ~ northness, data = df)
 
-plot_northness_eel <- ggplot(
+plot_northness_norcal <- ggplot(
   data = df,
   aes(x = northness, y = cwd_max)) +
   geom_hex(bins = 60) +
@@ -142,15 +141,15 @@ plot_northness_eel <- ggplot(
 
 # Add R²/n/slope. Northness is a dimensionless index (-1 to 1),
 # so the slope is reported per unit northness
-plot_northness_eel <- annotate_lm(
-  plot_northness_eel, mod_northness_eel, slope_unit = "mm/unit northness"
+plot_northness_norcal <- annotate_lm(
+  plot_northness_norcal, mod_northness_norcal, slope_unit = "mm/unit northness"
 )
 
 # Save plot
-save_fig(plot_northness_eel, "h2_eel_cwd_by_northness_subset")
+save_fig(plot_northness_norcal, "h2_norcal_cwd_by_northness_subset")
 
 # ---- Plot 2: TWI vs CWDmax by aspect ----------------------------------------
-plot_aspect_eel <- ggplot(
+plot_aspect_norcal <- ggplot(
   data = df,
   aes(x = twi, y = cwd_max, colour = aspect_class)) +
   geom_point(alpha = 0.04, size = 0.4) +
@@ -163,17 +162,17 @@ plot_aspect_eel <- ggplot(
   theme(legend.position = "top")
 
 # Per-aspect-group n label 
-plot_aspect_eel <- plot_aspect_eel +
+plot_aspect_norcal <- plot_aspect_norcal +
   annotate(
     "label",
     x = Inf, y = Inf, hjust = 1.05, vjust = 1.1,
-    label = label_n_aspect_eel,
+    label = label_n_aspect_norcal,
     size = 3.2, label.size = 0.3,
     label.padding = unit(0.4, "lines"),
     fill = scales::alpha("white", 0.9)
   )
 
-save_fig(plot_aspect_eel, "h2_eel_cwd_aspect_subset")
+save_fig(plot_aspect_norcal, "h2_norcal_cwd_aspect_subset")
 
 # ---- Plot 3: slope x aspect -------------------------------------------------
 # Fixed y-axis limits, shared with Plot 3 in
@@ -201,13 +200,13 @@ plot_slope_aspect <- plot_slope_aspect +
   annotate(
     "label",
     x = Inf, y = Inf, hjust = 1.05, vjust = 1.1,
-    label = label_n_aspect_eel,
+    label = label_n_aspect_norcal,
     size = 3.2, label.size = 0.3,
     label.padding = unit(0.4, "lines"),
     fill = scales::alpha("white", 0.9)
   )
 
-save_fig(plot_slope_aspect, "h2_eel_slope_aspect_subset")
+save_fig(plot_slope_aspect, "h2_norcal_slope_aspect_subset")
 
 # # ---- Plot 4: mean slope per elevation band ----------------------------------
 # # To test whether CWDmax is systematically overestimated at higher elevations, 
@@ -226,7 +225,7 @@ save_fig(plot_slope_aspect, "h2_eel_slope_aspect_subset")
 #   theme_classic() +
 #   theme(axis.text.x = element_text(angle = 35, hjust = 1, size = 8))
 # 
-# save_fig(plot_slope_elev, "h2_eel_slope_by_elev_subset")
+# save_fig(plot_slope_elev, "h2_norcal_slope_by_elev_subset")
 # 
 # # ---- Plot 5: CWDmax by slope class ------------------------------------------
 # plot_cwd_slope_class <- ggplot(
@@ -251,7 +250,7 @@ save_fig(plot_slope_aspect, "h2_eel_slope_aspect_subset")
 # plot_cwd_slope_class <- plot_cwd_slope_class +
 #   add_boxplot_n(df, "slope_class", "cwd_max")
 # 
-# save_fig(plot_cwd_slope_class, "h2_eel_cwd_by_slope_subset")
+# save_fig(plot_cwd_slope_class, "h2_norcal_cwd_by_slope_subset")
 
 # ---- Plot 6: TWI vs CWDmax, south-facing forest only ------------------------
 # Only high quality pixels are used for this plot. Restricting to south-facing
@@ -263,7 +262,7 @@ df_south_forest <- df |>
   dplyr::filter(aspect_class == "south-facing")
 
 # Plot
-mod_twi_forest_south_eel <- lm(cwd_max ~ twi, data = df_south_forest)
+mod_twi_forest_south_norcal <- lm(cwd_max ~ twi, data = df_south_forest)
 
 plot_twi_forest_south <- ggplot(
   data = df_south_forest,
@@ -281,11 +280,11 @@ plot_twi_forest_south <- ggplot(
 
 # Add R²/n/slope 
 plot_twi_forest_south <- annotate_lm(
-  plot_twi_forest_south, mod_twi_forest_south_eel, slope_unit = "mm/TWI unit"
+  plot_twi_forest_south, mod_twi_forest_south_norcal, slope_unit = "mm/TWI unit"
 )
 
 # Save plot
-save_fig(plot_twi_forest_south, "h2_eel_twi_forest_south_subset")
+save_fig(plot_twi_forest_south, "h2_norcal_twi_forest_south_subset")
 
 # ---- Plot 7: TWI vs CWDmax, forest only, all aspects pooled -----------------
 # Test whether the shading bias is also present, when all aspects are pooled.
@@ -294,7 +293,7 @@ df_forest_pooled <- df |>
   dplyr::filter(nlcd %in% c(41, 42, 43))   # deciduous/evergreen/mixed forest
 
 # Plot
-mod_twi_forest_pooled_eel <- lm(cwd_max ~ twi, data = df_forest_pooled)
+mod_twi_forest_pooled_norcal <- lm(cwd_max ~ twi, data = df_forest_pooled)
 
 plot_twi_forest_pooled <- ggplot(
   data = df_forest_pooled,
@@ -311,8 +310,8 @@ plot_twi_forest_pooled <- ggplot(
   theme_classic()
 
 plot_twi_forest_pooled <- annotate_lm(
-  plot_twi_forest_pooled, mod_twi_forest_pooled_eel, slope_unit = "mm/TWI unit"
+  plot_twi_forest_pooled, mod_twi_forest_pooled_norcal, slope_unit = "mm/TWI unit"
 )
 
 # Save plot
-save_fig(plot_twi_forest_pooled, "h2_eel_twi_forest_pooled_subset")
+save_fig(plot_twi_forest_pooled, "h2_norcal_twi_forest_pooled_subset")

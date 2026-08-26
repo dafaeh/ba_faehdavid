@@ -1,7 +1,7 @@
-# 03_h1_h2_topography_eel.R
+# 03_h1_h2_topography_northern_california.R
 
-# H1 (elevation) uses the full Eel River focus region.
-# H2 (TWI) is restricted to eel_shading_subset
+# H1 (elevation) uses the full Northern California focus region.
+# H2 (TWI) is restricted to the Northern California subset
 
 # ---- Setup ------------------------------------------------------------------
 library(terra)
@@ -22,8 +22,8 @@ source(here("R", "save_fig.R"))
 set.seed(42) # For reproducibility
 
 # Load data
-path_cwd    <- here("data", "eel_9ref.tif")
-path_stack  <- here("data", "stack_eel.tif")
+path_cwd    <- here("data", "cwd_northern_california.tif")
+path_stack  <- here("data", "stack_northern_california.tif")
 
 # Define sample size
 n_sample    <- 1000000
@@ -40,7 +40,7 @@ lanid <- stack_pre[["lanid"]]
 stack        <- c(cwd, elev, twi)
 names(stack) <- c("cwd_max", "elevation", "twi")
 
-# ---- Subsample (full Eel River region, used for H1) -------------------------
+# ---- Subsample (full Northern California region, used for H1) ---------------
 df_full <- terra::spatSample(
   stack,
   size   = n_sample * 2,
@@ -80,9 +80,9 @@ plot_elev_hex <- ggplot(df, aes(x = elevation, y = cwd_max)) +
 plot_elev_hex <- annotate_lm(plot_elev_hex, mod_h1, slope_unit = "mm/m")
 
 # Save plot
-save_fig(plot_elev_hex, "h1_elev_hex_eel")
+save_fig(plot_elev_hex, "h1_elev_hex_norcal")
 
-# ---- Restrict to eel_subset (used for H2) ----------------------------
+# ---- Restrict to the Northern California subset (used for H2) ---------------
 # Subset defined directly in EPSG:5070 
 ext_subset <- terra::ext(
   -2336730, -2229380,   # xmin, xmax
@@ -100,7 +100,7 @@ stack_subset        <- c(
 )
 names(stack_subset) <- c("cwd_max", "elevation", "twi")
 
-# ---- Subsample (eel_shading_subset, used for H2) -----------------------------
+# ---- Subsample for northern_california_subset -----------------------------
 df_subset_full <- terra::spatSample(
   stack_subset,
   size   = n_sample * 2,
@@ -141,4 +141,4 @@ plot_cwd_twi <- ggplot(df_subset, aes(x = twi, y = cwd_max)) +
 plot_cwd_twi <- annotate_lm(plot_cwd_twi, mod_h2, slope_unit = "mm/TWI unit")
 
 # Save plot
-save_fig(plot_cwd_twi, "h2_twi_hex_eel_subset")
+save_fig(plot_cwd_twi, "h2_twi_hex_norcal_subset")

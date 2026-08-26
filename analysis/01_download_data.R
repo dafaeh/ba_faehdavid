@@ -1,10 +1,11 @@
 # 01_download_data.R
 # Downloads SGMC, LANID and TWI into data-raw. Run once before anything else.
-#
+
 # Not downloaded here:
 #   NLCD: streamed and baked into each stack by 02_preprocess_data.R
-#   CWD (<region>_9ref.tif) and elevation (elevation_<region>.tif): GEE
-#     exports, place manually in data/.
+#   CWD (cwd_<region>.tif): GEE export, place manually in data/.
+#   Elevation (elevation_<region>.tif) and ET comparison
+#     (et_comparison_2020_2022.tif): GEE exports, place manually in data-raw/.
 
 # ---- Setup ------------------------------------------------------------------
 library(here)

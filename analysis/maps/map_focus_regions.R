@@ -181,7 +181,7 @@ make_region_map <- function(raster_path, title = NULL, zoom = 10,
 
 # ---- Generate maps ----------------------------------------------------------
 map_norcal <- make_region_map(
-  raster_path = here("data", "eel_9ref.tif"),
+  raster_path = here("data", "cwd_northern_california.tif"),
   title       = "Northern California",
   lon_break_width = 0.5,
   subset_bbox = c(
@@ -190,15 +190,15 @@ map_norcal <- make_region_map(
   )
 )
 map_texas <- make_region_map(
-  raster_path = here("data", "edwards_plateau_9ref.tif"),
+  raster_path = here("data", "cwd_edwards_plateau.tif"),
   title       = "Edwards Plateau"
 )
 map_highplains <- make_region_map(
-  raster_path = here("data", "high_plains_9ref.tif"),
+  raster_path = here("data", "cwd_high_plains.tif"),
   title       = "High Plains"
 )
 map_appalachians <- make_region_map(
-  raster_path = here("data", "appalachia_9ref.tif"),
+  raster_path = here("data", "cwd_appalachia.tif"),
   title       = "Appalachians"
 )
 

@@ -1,5 +1,5 @@
 # 06_shading_artefact_appalachia.R
-# This script works in the same way as the 05_shading_artefact_eel.R one but 
+# This script works in the same way as the 05_shading_artefact_northern_california.R one but
 # for the appalachians focus region. 
 
 # A slightly different approach is used when filtering for high-quality pixels
@@ -28,7 +28,7 @@ aspect_colours <- c(
 )
 
 # Load data
-cwd       <- terra::rast(here("data", "appalachia_9ref.tif"))[["cwd_max"]]
+cwd       <- terra::rast(here("data", "cwd_appalachia.tif"))[["cwd_max"]]
 
 stack_pre <- terra::rast(here("data", "stack_appalachia.tif"))
 elevation <- stack_pre[["elevation"]]
@@ -167,9 +167,7 @@ save_fig(plot_aspect_appalachia, "h2_appalachia_cwd_aspect")
 
 # ---- Plot 3: slope x aspect ------------------------------------------------
 # Fixed y-axis limits, shared with Plot 3 in
-# 05_shading_artefact_eel.R for cross-region comparability.
-# NOTE: 05 currently uses c(137.7566, 826.7845), so the two axes are not
-# strictly identical. Harmonise before the figures go into the thesis.
+# 05_shading_artefact_northern_california.R for cross-region comparability.
 shared_y_limits_slope_aspect <- c(137, 826)
 
 plot_slope_aspect <- df |>

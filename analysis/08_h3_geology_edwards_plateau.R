@@ -1,4 +1,4 @@
-# 09_h3_geology_edwards_plateau.R
+# 08_h3_geology_edwards_plateau.R
 # Tests H3 for the Edwards Plateau focus region.
 # Compares CWDmax between carbonate and clastic geological substrates
 
@@ -18,7 +18,7 @@ source(here("R", "save_fig.R"))
 set.seed(42)
 
 # Load CWD and LANID rasters
-r      <- terra::rast(here("data", "edwards_plateau_9ref.tif"))
+r      <- terra::rast(here("data", "cwd_edwards_plateau.tif"))
 r_cwd  <- r[["cwd_max"]]
 r_gaps <- r[["gap_filled_months"]]
 

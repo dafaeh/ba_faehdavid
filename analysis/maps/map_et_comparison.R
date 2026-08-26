@@ -16,7 +16,7 @@ library(here)
 
 # ---- Load data --------------------------------------------------------------
 r_et         <- terra::rast(here("data-raw", "et_comparison_2020_2022.tif"))
-r_cwd_norcal <- terra::rast(here("data", "eel_9ref.tif"))[["cwd_max"]]
+r_cwd_norcal <- terra::rast(here("data", "cwd_northern_california.tif"))[["cwd_max"]]
 
 # ---- Crop CWD_max to the ET window ------------------------------------------
 # Both rasters come out of the same export settings (EPSG:5070, 30 m), so a

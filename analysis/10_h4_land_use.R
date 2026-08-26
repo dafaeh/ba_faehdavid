@@ -1,4 +1,4 @@
-# 11_h4_land_use_high_plains.R
+# 10_h4_land_use_high_plains.R
 # Tests H4 on the High Plains region. Does CWDmax differ across
 # land-use types?
 # The classes are: Cropland irrigated, Cropland rainfed,
@@ -22,7 +22,7 @@ set.seed(42)
 
 
 # Load data 
-r <- terra::rast(here("data", "high_plains_9ref.tif"))
+r <- terra::rast(here("data", "cwd_high_plains.tif"))
 
 stack_pre <- terra::rast(here("data", "stack_high_plains.tif"))
 nlcd      <- stack_pre[["nlcd"]]
